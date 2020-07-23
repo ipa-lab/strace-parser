@@ -24,5 +24,6 @@ executable strace-parser
       base >=4.14 && <4.15
     , megaparsec
     , text
+    , time
   -- hs-source-dirs:
   default-language:    Haskell2010
