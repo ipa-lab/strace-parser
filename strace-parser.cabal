@@ -18,12 +18,20 @@ build-type:          Simple
 
 executable strace-parser
   main-is:             Main.hs
-  -- other-modules:
+  other-modules:       
+    Strace.Types, 
+    Strace.Parser, 
+    Strace.Raw, 
+    Strace.Events, 
+    Strace.Finish, 
+    Strace.FileDescriptors
+    Strace.Pretty
   -- other-extensions:
   build-depends:
       base >=4.14 && <4.15
     , megaparsec
     , text
     , time
+    , containers
   -- hs-source-dirs:
   default-language:    Haskell2010
