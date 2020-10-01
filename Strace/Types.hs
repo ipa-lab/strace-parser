@@ -1,9 +1,10 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StrictData #-}
 
 module Strace.Types where
 
+import Data.String (IsString)
 import Data.Text (Text)
 import Data.Time.Clock.System (SystemTime)
 import Data.Word (Word32)
@@ -17,7 +18,7 @@ type Trace = [Line Event]
 -- line. After putting interrupted system calls back together, a `Line` may
 -- represent a system event that is actually derived from multiple lines in the
 -- original @strace@ log.
-data Line a = Line (Maybe PID) (Maybe Time) a
+data Line a = Line PID SystemTime a
   deriving (Show, Functor)
 
 -- | A system event.
@@ -29,8 +30,44 @@ data Event
   deriving (Show)
 
 data SystemCall
-  = OtherSystemCall SystemCallName Text SystemCallStatus
+  = Openat Dirfd Path (Flags OpenFlag) FileDescriptor  -- TODO: mode, errors
+  | Close FileDescriptor Int
+  | Execve Path [Text] [Text] Int
+  | OtherSystemCall SystemCallName Text SystemCallStatus
   deriving (Show)
+
+type Path = Text
+
+type FileDescriptor = Int  -- TODO
+
+data Dirfd = AT_FDCWD | Dirfd FileDescriptor
+  deriving (Eq, Ord, Show)
+
+type Flags a = [a] -- TODO: more efficient representation (set/bitset/...)
+
+data OpenFlag
+  = O_RDONLY
+  | O_WRONLY
+  | O_RDWR
+  | O_APPEND
+  | O_ASYNC
+  | O_CLOEXEC
+  | O_CREAT
+  | O_DIRECT
+  | O_DIRECTORY
+  | O_DSYNC
+  | O_EXCL
+  | O_LARGEFILE
+  | O_NOATIME
+  | O_NOCTTY
+  | O_NOFOLLOW
+  | O_NONBLOCK
+  | O_NDELAY
+  | O_PATH
+  | O_SYNC
+  | O_TMPFILE
+  | O_TRUNC
+  deriving (Eq, Ord, Read, Show)
 
 -- | Indicates whether the system call was interrupted.
 data SystemCallStatus = Finished | Unfinished | Resumed
@@ -44,13 +81,8 @@ data Signal
 newtype PID = PID Word32
   deriving (Num, Enum, Eq, Ord, Show)
 
-data Time = Instant Timestamp | Duration Timestamp Timestamp
-  deriving (Show)
-
-type Timestamp = SystemTime
-
 newtype SystemCallName = SystemCallName Text
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, IsString)
 
 newtype SignalName = SignalName Text
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, IsString)

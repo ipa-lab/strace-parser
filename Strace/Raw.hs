@@ -23,7 +23,7 @@ line = do
   timestamp <- lexeme timestamp
   event <- choice [exit, killed, signal, systemCallResumed, systemCall]
   void eol <|> eof
-  return $ Line (Just pid) (Just $ Instant timestamp) event -- TODO
+  return $ Line pid timestamp event
 
 exit :: Parser Event
 exit = Exit <$> (symbol "+++ exited with" *> lexeme L.decimal <* symbol "+++")

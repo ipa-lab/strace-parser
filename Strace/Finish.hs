@@ -16,7 +16,7 @@ finishSystemCalls :: Trace -> Trace
 finishSystemCalls = reverse . snd . foldl' go (mempty, [])
   where    
     go :: (SysCallMap, Trace) -> Line Event -> (SysCallMap, Trace)
-    go (m, ls) l@(Line (Just pid) t2 (SystemCall c2))
+    go (m, ls) l@(Line pid t2 (SystemCall c2))
       | OtherSystemCall _ _ Unfinished <- c2 =
         let m' = IntMap.insert (fromEnum pid) l m in (m', ls)
       | OtherSystemCall name2 args2 Resumed <- c2,
@@ -24,7 +24,7 @@ finishSystemCalls = reverse . snd . foldl' go (mempty, [])
         OtherSystemCall name1 args1 Unfinished <- c1,
         name1 == name2 =
         let m' = IntMap.delete (fromEnum pid) m
-            l' = Line (Just pid) t1 (SystemCall c') -- TODO: merge t1 and t2 ?
+            l' = Line pid t1 (SystemCall c') -- TODO: merge t1 and t2 ?
             c' = OtherSystemCall name1 (args1 <> args2) Finished
          in (m', l' : ls)
     go (m, ls) l = (m, l : ls)

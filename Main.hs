@@ -31,14 +31,18 @@ import Text.ParserCombinators.ReadP (ReadP, readP_to_S)
 import Text.Printf
 import Text.Read.Lex (readHexP, readOctP)
 import Strace.Pretty
+import Strace.Events
 
--- TODO/NOTES:
--- with the -v option, environment vars (might) get expanded
--- (but might need to increase string length to actually see)
+-- We assume the following strace invocation: 
+--
+--      strace -f -ttt -v -x -s 1048576
+--
+-- This follows forks and shows PIDs (-f), prints timestamps in the right format
+-- (-ttt), expands all structures incl. env vars (-v), prints non-ascii strings
+-- in hex format (-x) and prints strings up to 1 MB (-s 1048576).
+--
 
--- TODO: the -y option adds filenames to file descriptors
--- the 2nd pass should prob resolve fd args as (FileDesc Int | FileName Text)
--- the 3rd should try to resolve all unresolved filedescs
+-- TODO: check whether -x is necessary
 
 main :: IO ()
 main = do
@@ -47,13 +51,23 @@ main = do
   r1 <- parseRawTrace straceFile
   case r1 of
     Left err -> putStrLn err
-    Right t1 -> do
+    Right t1_ -> do
+      let t1 = t1_ --take 30 t1_
+
       print (length t1)
-      putStrLn $ prettyTrace t1
+      -- putStrLn $ prettyTrace t1
 
       let t2 = finishSystemCalls t1
       print (length t2)
-      putStrLn $ prettyTrace t2
+      --putStrLn $ prettyTrace t2
+
+      let isFoo (Line _ _ (SystemCall (OtherSystemCall _ _ _))) = False
+          isFoo (Line _ _ (SystemCall _)) = True
+          isFoo _ = False
+
+      let t3 = filter isFoo $ parseEvents t2
+      print (length t3)
+      putStrLn $ prettyTrace t3
 
   -- r <- do
   --   t1 <- liftIO $ parseRawTrace straceFile
