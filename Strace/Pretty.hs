@@ -31,9 +31,9 @@ prettySysCall = \case
   OtherSystemCall name args Unfinished -> printf "%s%s <unfinished ...>" (prettySysCallName name) args
   OtherSystemCall name args Resumed -> printf "<... %s resumed>%s" (prettySysCallName name) args
   Execve path args env retval -> printf "execve %s %s <%d env vars> = %d" (show path) (show args) (length env) retval
-  Openat dirfd path flags fd -> printf "openat %s %s %s = %d" (show dirfd) (show path) (show flags) fd
-  Close fd retval -> printf "close %d = %d" fd retval
-  Read fd buf count retval -> printf "read %s <%d bytes> %s = %s" (show fd) (Text.length buf) (show count) (show retval)
+  Openat dirfd path flags fd -> printf "openat %s %s %s = %s" (show dirfd) (show path) (show flags) (prettyFd fd)
+  Close fd retval -> printf "close %s = %d" (prettyFd fd) retval
+  Read fd buf count retval -> printf "read %s <%d bytes> %s = %s" (prettyFd fd) (Text.length buf) (show count) (show retval)
   _ -> undefined
 
 prettySysCallName :: SystemCallName -> String
@@ -41,3 +41,6 @@ prettySysCallName (SystemCallName n) = Text.unpack n
 
 prettySignalName :: SignalName -> String
 prettySignalName (SignalName n) = Text.unpack n
+
+prettyFd :: FileDescriptor -> String
+prettyFd (FileDescriptor fd path) = printf "%s<%s>" (show fd) (Text.unpack path)

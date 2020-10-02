@@ -167,9 +167,12 @@ systemCallName = SystemCallName <$> takeWhile1P (Just "system call name") (\s ->
 signalName :: Parser SignalName
 signalName = SignalName <$> takeWhile1P (Just "signal name") isAsciiUpper
 
--- TODO
 fileDescriptor :: Parser FileDescriptor
-fileDescriptor = L.decimal
+fileDescriptor = do
+  fd <- L.decimal
+  "<"
+  path <- Text.pack <$> manyTill cLiteral (char '>')  
+  return $ FileDescriptor fd path
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc

@@ -51,7 +51,7 @@ openat = do
   ", "
   flags <- parseFlags parseRead
   lexeme ")"
-  fd <- returnValue -- TODO
+  fd <- fileDescriptor
   return $ Openat dirfd path flags fd
 
 close :: Parser SystemCall
@@ -65,7 +65,7 @@ close = do
 read_ :: Parser SystemCall
 read_ = do
   "("
-  fd <- fromIntegral <$> fileDescriptor
+  fd <- fileDescriptor
   ", "
   buf <- stringLiteral
   ", "

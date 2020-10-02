@@ -33,7 +33,7 @@ data Event
 data SystemCall
   = Openat Dirfd Path (Flags OpenFlag) FileDescriptor  -- TODO: mode, errors
   | Close FileDescriptor Int
-  | Read Fd Text ByteCount ByteCount -- TODO: ByteString? plus: retval more complicated
+  | Read FileDescriptor Text ByteCount ByteCount -- TODO: ByteString? plus: retval more complicated
   | Execve Path [Text] [Text] Int
   | OtherSystemCall SystemCallName Text SystemCallStatus
   deriving (Show)
@@ -44,10 +44,11 @@ data SystemCall
 
 type Path = Text
 
-type FileDescriptor = Int  -- TODO
+data FileDescriptor = FileDescriptor Fd Path
+  deriving (Show)
 
 data Dirfd = AT_FDCWD | Dirfd FileDescriptor
-  deriving (Eq, Ord, Show)
+  deriving (Show)
 
 type Flags a = [a] -- TODO: more efficient representation (set/bitset/...)
 

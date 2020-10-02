@@ -35,11 +35,12 @@ import Strace.Events
 
 -- We assume the following strace invocation: 
 --
---      strace -f -ttt -v -x -s 1048576
+--      strace -f -ttt -v -x -y -s 1048576
 --
 -- This follows forks and shows PIDs (-f), prints timestamps in the right format
 -- (-ttt), expands all structures incl. env vars (-v), prints non-ascii strings
--- in hex format (-x) and prints strings up to 1 MB (-s 1048576).
+-- in hex format (-x), resolves file descriptors (-y) and prints strings up to 1
+-- MB (-s 1048576).
 --
 
 -- TODO: check whether -x is necessary

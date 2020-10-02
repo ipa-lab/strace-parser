@@ -24,7 +24,6 @@ executable strace-parser
     Strace.Raw, 
     Strace.Events, 
     Strace.Finish, 
-    Strace.FileDescriptors
     Strace.Pretty
   -- other-extensions:
   build-depends:
