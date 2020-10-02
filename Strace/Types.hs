@@ -8,6 +8,7 @@ import Data.String (IsString)
 import Data.Text (Text)
 import Data.Time.Clock.System (SystemTime)
 import Data.Word (Word32)
+import System.Posix.Types
 
 -- | A system trace.
 type Trace = [Line Event]
@@ -18,7 +19,7 @@ type Trace = [Line Event]
 -- line. After putting interrupted system calls back together, a `Line` may
 -- represent a system event that is actually derived from multiple lines in the
 -- original @strace@ log.
-data Line a = Line PID SystemTime a
+data Line a = Line ProcessID SystemTime a
   deriving (Show, Functor)
 
 -- | A system event.
@@ -32,9 +33,14 @@ data Event
 data SystemCall
   = Openat Dirfd Path (Flags OpenFlag) FileDescriptor  -- TODO: mode, errors
   | Close FileDescriptor Int
+  | Read Fd Text ByteCount ByteCount -- TODO: ByteString? plus: retval more complicated
   | Execve Path [Text] [Text] Int
   | OtherSystemCall SystemCallName Text SystemCallStatus
   deriving (Show)
+
+-- TODO: string type with truncation info
+
+--type RetVal a = Either Errno a
 
 type Path = Text
 
@@ -76,10 +82,6 @@ data SystemCallStatus = Finished | Unfinished | Resumed
 data Signal
   = OtherSignal SignalName Text
   deriving (Show)
-
--- | A process ID.
-newtype PID = PID Word32
-  deriving (Num, Enum, Eq, Ord, Show)
 
 newtype SystemCallName = SystemCallName Text
   deriving (Eq, Ord, Show, IsString)

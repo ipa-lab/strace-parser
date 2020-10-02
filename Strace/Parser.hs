@@ -44,6 +44,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 import Text.ParserCombinators.ReadP (ReadP, readP_to_S)
 import Text.Printf
 import Text.Read.Lex (readHexP, readOctP)
+import System.Posix.Types
 
 -------------------------------------------------------------------------------
 
@@ -150,8 +151,8 @@ parseFlags p = p `sepBy` char '|'
 --   str <- manyTill anySingle (char ']')
 --   return $ Text.pack $ '[' : str ++ "]"
 
-pid :: Parser PID
-pid = PID <$> L.decimal
+pid :: Parser ProcessID
+pid = L.decimal
 
 timestamp :: Parser SystemTime
 timestamp = do

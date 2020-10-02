@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 
 -- | Pass to parse system calls and signals and their arguments.
 module Strace.Events (parseEvents) where
@@ -8,6 +9,7 @@ import Strace.Types
 import Strace.Parser
 import Data.Maybe
 import Control.Applicative
+import Text.Megaparsec.Char.Lexer qualified as L
 
 parseEvents :: Trace -> Trace
 parseEvents = map $
@@ -21,6 +23,7 @@ parseSystemCall c@(OtherSystemCall name args Finished) = case name of
   "execve" -> parse execve
   "openat" -> parse openat
   "close" -> parse close
+  "read" -> parse read_
   _ -> c
  where
    parse f = fromMaybe c $ parseMaybe f args
@@ -58,6 +61,18 @@ close = do
   lexeme ")"
   retval <- returnValue
   return $ Close fd retval  
+
+read_ :: Parser SystemCall
+read_ = do
+  "("
+  fd <- fromIntegral <$> fileDescriptor
+  ", "
+  buf <- stringLiteral
+  ", "
+  count <- L.decimal
+  lexeme ")"
+  retSize <- fromIntegral <$> returnValue -- TODO
+  return $ Read fd buf count retSize
 
 pDirfd :: Parser Dirfd
 pDirfd = ("AT_FDCWD" *> return AT_FDCWD) <|> Dirfd <$> fileDescriptor
