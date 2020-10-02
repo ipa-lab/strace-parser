@@ -19,7 +19,8 @@ module Strace.Parser
     returnValue,
     fileDescriptor,
     parseRead,
-    parseFlags
+    parseFlags,
+    structLiteral
   )
 where
 
@@ -52,6 +53,12 @@ type Parser = Parsec Void Text
 
 -------------------------------------------------------------------------------
 
+-- TODO: idea: lexer phase that returns only string tokens, but handles arg list, arrays, structs, maybe return value?
+-- data Token 
+--     = StringLiteral Text Truncation 
+--     | ArrayLiteral [Token] 
+--     | StructLiteral [(Text,Token)] 
+--     | OtherLiteral Text
 
 
 ------
@@ -139,11 +146,13 @@ parseRead = do
 parseFlags :: Parser a -> Parser (Flags a)
 parseFlags p = p `sepBy` char '|'
 
--- structLiteral :: Parser Text
--- structLiteral = label "struct argument" $ do
---   char '{'
---   str <- manyTill anySingle (char '}')
---   return $ Text.pack $ '{' : str ++ "}"
+-- TODO: returns just a string
+-- TODO: can't handle nested structs
+structLiteral :: Parser Text
+structLiteral = label "struct argument" $ do
+  char '{'
+  str <- manyTill anySingle (char '}')
+  return $ Text.pack $ '{' : str ++ "}"
 
 -- arrayLiteral :: Parser Text
 -- arrayLiteral = label "array argument" $ do

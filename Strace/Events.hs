@@ -1,15 +1,18 @@
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ImportQualifiedPost #-}
 
 -- | Pass to parse system calls and signals and their arguments.
 module Strace.Events (parseEvents) where
 
-import Strace.Types
-import Strace.Parser
-import Data.Maybe
 import Control.Applicative
+import Control.Monad
+import Data.Maybe
+import Strace.Parser
+import Strace.Types
+import Text.Megaparsec
 import Text.Megaparsec.Char.Lexer qualified as L
+import Text.Megaparsec.Char
 
 parseEvents :: Trace -> Trace
 parseEvents = map $
@@ -24,10 +27,10 @@ parseSystemCall c@(OtherSystemCall name args Finished) = case name of
   "openat" -> parse openat
   "close" -> parse close
   "read" -> parse read_
+  "stat" -> parse stat
   _ -> c
- where
-   parse f = fromMaybe c $ parseMaybe f args
-
+  where
+    parse f = fromMaybe c $ parseMaybe f args
 parseSystemCall x = x
 
 execve :: Parser SystemCall
@@ -51,6 +54,7 @@ openat = do
   ", "
   flags <- parseFlags parseRead
   lexeme ")"
+  lexeme "="
   fd <- fileDescriptor
   return $ Openat dirfd path flags fd
 
@@ -60,7 +64,7 @@ close = do
   fd <- fileDescriptor
   lexeme ")"
   retval <- returnValue
-  return $ Close fd retval  
+  return $ Close fd retval
 
 read_ :: Parser SystemCall
 read_ = do
@@ -74,6 +78,29 @@ read_ = do
   retSize <- fromIntegral <$> returnValue -- TODO
   return $ Read fd buf count retSize
 
+stat :: Parser SystemCall
+stat = do
+  "("
+  path <- stringLiteral
+  ", "
+  r <- try success <|> failure
+  return $ Stat path r
+  where
+    success = do
+      statStruct <- structLiteral
+      lexeme ")"
+      lexeme "="
+      "0"
+      return $ Right statStruct
+    failure = do
+      void $ "0x" *> L.hexadecimal
+      lexeme ")"
+      lexeme "="
+      lexeme "-1"
+      errno <- parseRead
+      void $ takeRest
+      return $ Left errno
+
 pDirfd :: Parser Dirfd
 pDirfd = ("AT_FDCWD" *> return AT_FDCWD) <|> Dirfd <$> fileDescriptor
 
@@ -82,8 +109,4 @@ parseSignal s@(OtherSignal name info) = case name of
   _ -> s
 parseSignal x = x
 
-
 -- note: filenames are not considered strings and are never abbreviated
-
-
-

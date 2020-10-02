@@ -35,12 +35,18 @@ data SystemCall
   | Close FileDescriptor Int
   | Read FileDescriptor Text ByteCount ByteCount -- TODO: ByteString? plus: retval more complicated
   | Execve Path [Text] [Text] Int
+  | Stat Path (Either Errno StatStruct)
   | OtherSystemCall SystemCallName Text SystemCallStatus
   deriving (Show)
 
 -- TODO: string type with truncation info
 
 --type RetVal a = Either Errno a
+
+data Errno = ENOENT
+  deriving (Eq, Ord, Read, Show)
+
+type StatStruct = Text  -- TODO
 
 type Path = Text
 

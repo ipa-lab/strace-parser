@@ -34,6 +34,8 @@ prettySysCall = \case
   Openat dirfd path flags fd -> printf "openat %s %s %s = %s" (show dirfd) (show path) (show flags) (prettyFd fd)
   Close fd retval -> printf "close %s = %d" (prettyFd fd) retval
   Read fd buf count retval -> printf "read %s <%d bytes> %s = %s" (prettyFd fd) (Text.length buf) (show count) (show retval)
+  Stat path (Left errno) -> printf "stat %s = -1 %s" (show path) (show errno)
+  Stat path (Right _) -> printf "stat %s <struct> = 0" (show path)
   _ -> undefined
 
 prettySysCallName :: SystemCallName -> String
