@@ -30,9 +30,9 @@ prettySysCall = \case
   OtherSystemCall name args Finished -> printf "%s%s" (prettySysCallName name) args
   OtherSystemCall name args Unfinished -> printf "%s%s <unfinished ...>" (prettySysCallName name) args
   OtherSystemCall name args Resumed -> printf "<... %s resumed>%s" (prettySysCallName name) args
-  Execve path args env retval -> printf "execve %s %s <%d env vars> = %d" (show path) (show args) (length env) retval
-  Openat dirfd path flags fd -> printf "openat %s %s %s = %s" (show dirfd) (show path) (show flags) (prettyFd fd)
-  Close fd retval -> printf "close %s = %d" (prettyFd fd) retval
+  Execve path args env errno -> printf "execve %s %s <%d env vars> %s" (show path) (show args) (length env) (show errno)
+  Openat dirfd path flags fd -> printf "openat %s %s %s = %s" (show dirfd) (show path) (show flags) (show fd)
+  Close fd retval -> printf "close %s = %s" (prettyFd fd) (show retval)
   Read fd buf count retval -> printf "read %s <%d bytes> %s = %s" (prettyFd fd) (Text.length buf) (show count) (show retval)
   Stat path (Left errno) -> printf "stat %s = -1 %s" (show path) (show errno)
   Stat path (Right _) -> printf "stat %s <struct> = 0" (show path)

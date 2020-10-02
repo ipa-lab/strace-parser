@@ -31,20 +31,18 @@ data Event
   deriving (Show)
 
 data SystemCall
-  = Openat Dirfd Path (Flags OpenFlag) FileDescriptor  -- TODO: mode, errors
-  | Close FileDescriptor Int
-  | Read FileDescriptor Text ByteCount ByteCount -- TODO: ByteString? plus: retval more complicated
-  | Execve Path [Text] [Text] Int
+  = Openat Dirfd Path (Flags OpenFlag) (Either Errno FileDescriptor)  -- TODO: mode
+  | Close FileDescriptor (Maybe Errno)
+  | Read FileDescriptor Text ByteCount (Either Errno ByteCount) -- TODO: ByteString?
+  | Execve Path [Text] [Text] (Maybe Errno)
   | Stat Path (Either Errno StatStruct)
   | OtherSystemCall SystemCallName Text SystemCallStatus
   deriving (Show)
 
 -- TODO: string type with truncation info
 
---type RetVal a = Either Errno a
-
-data Errno = ENOENT
-  deriving (Eq, Ord, Read, Show)
+newtype Errno = Errno Text
+  deriving (Eq, Ord, Show, IsString)
 
 type StatStruct = Text  -- TODO
 

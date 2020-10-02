@@ -16,7 +16,7 @@ module Strace.Parser
     parseMaybe,
     stringLiteral,
     stringArray,
-    returnValue,
+    parseErrno,
     fileDescriptor,
     parseRead,
     parseFlags,
@@ -126,11 +126,10 @@ stringArray = do
   char ']'
   return elems
 
--- TODO: errors with info
-returnValue :: Parser Int
-returnValue = do
-  lexeme "="
-  L.decimal
+
+parseErrno :: Parser Errno
+parseErrno = Errno <$> takeWhile1P Nothing isAsciiUpper
+
 
 -- based on https://stackoverflow.com/a/54391219
 -- TODO: this might not be very efficient...

@@ -13,6 +13,8 @@ import Strace.Types
 import Text.Megaparsec
 import Text.Megaparsec.Char.Lexer qualified as L
 import Text.Megaparsec.Char
+import Data.Char
+import Data.Functor
 
 parseEvents :: Trace -> Trace
 parseEvents = map $
@@ -34,49 +36,44 @@ parseSystemCall c@(OtherSystemCall name args Finished) = case name of
 parseSystemCall x = x
 
 execve :: Parser SystemCall
-execve = do
-  "("
-  path <- stringLiteral
-  ", "
-  args <- stringArray
-  ", "
-  env <- stringArray
-  lexeme ")"
-  retval <- returnValue
-  return $ Execve path args env retval
+execve = syscall3 Execve stringLiteral stringArray stringArray maybeErrno
 
-openat :: Parser SystemCall
-openat = do
+eitherErrnoOr :: Parser a -> Parser (Either Errno a)
+eitherErrnoOr p = (lexeme "-1" *> (Left <$> parseErrno) <* takeRest) <|> (Right <$> p)
+
+maybeErrno :: Parser (Maybe Errno)
+maybeErrno = either Just (const Nothing) <$> eitherErrnoOr "0"
+
+syscall1 :: (a1 -> r -> SystemCall) -> Parser a1 -> Parser r -> Parser SystemCall
+syscall1 f p1 pr = do
   "("
-  dirfd <- pDirfd
-  ", "
-  path <- stringLiteral
-  ", "
-  flags <- parseFlags parseRead
+  a1 <- p1
   lexeme ")"
   lexeme "="
-  fd <- fileDescriptor
-  return $ Openat dirfd path flags fd
+  r <- pr
+  return $ f a1 r
+
+syscall3 :: (a1 -> a2 -> a3 -> r -> SystemCall) -> Parser a1 -> Parser a2 -> Parser a3 -> Parser r -> Parser SystemCall
+syscall3 f p1 p2 p3 pr = do
+  "("
+  a1 <- p1
+  ", "
+  a2 <- p2
+  ", "
+  a3 <- p3
+  lexeme ")"
+  lexeme "="
+  r <- pr
+  return $ f a1 a2 a3 r
+
+openat :: Parser SystemCall
+openat = syscall3 Openat pDirfd stringLiteral (parseFlags parseRead) (eitherErrnoOr fileDescriptor)
 
 close :: Parser SystemCall
-close = do
-  "("
-  fd <- fileDescriptor
-  lexeme ")"
-  retval <- returnValue
-  return $ Close fd retval
+close = syscall1 Close fileDescriptor maybeErrno
 
 read_ :: Parser SystemCall
-read_ = do
-  "("
-  fd <- fileDescriptor
-  ", "
-  buf <- stringLiteral
-  ", "
-  count <- L.decimal
-  lexeme ")"
-  retSize <- fromIntegral <$> returnValue -- TODO
-  return $ Read fd buf count retSize
+read_ = syscall3 Read fileDescriptor stringLiteral L.decimal (eitherErrnoOr L.decimal)
 
 stat :: Parser SystemCall
 stat = do
@@ -97,7 +94,7 @@ stat = do
       lexeme ")"
       lexeme "="
       lexeme "-1"
-      errno <- parseRead
+      errno <- parseErrno
       void $ takeRest
       return $ Left errno
 
