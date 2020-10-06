@@ -15,9 +15,12 @@ import qualified Text.Megaparsec.Char.Lexer as L
 
 parseRawTrace :: FilePath -> IO (Either String Trace)
 parseRawTrace file =
-  first errorBundlePretty . parse (line `manyTill` eof) file <$> Text.readFile file
+  first errorBundlePretty . parse trace file <$> Text.readFile file
 
-line :: Parser (Line Event)
+trace :: Parser Trace
+trace = line `manyTill` eof
+
+line :: Parser Line
 line = do
   pid <- lexeme pid
   timestamp <- lexeme timestamp
@@ -36,7 +39,7 @@ signal = do
   symbol "---"
   name <- lexeme signalName
   info <- Text.pack <$> manyTill anySingle " ---" <?> "siginfo"
-  return $ Signal $ OtherSignal name info
+  return $ Signal name info
 
 systemCallResumed :: Parser Event
 systemCallResumed = do

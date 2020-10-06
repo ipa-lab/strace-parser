@@ -10,12 +10,12 @@ import qualified Data.IntMap.Strict as IntMap
 import Debug.Trace
 import Strace.Types
 
-type SysCallMap = IntMap (Line Event)
+type SysCallMap = IntMap Line
 
 finishSystemCalls :: Trace -> Trace
 finishSystemCalls = reverse . snd . foldl' go (mempty, [])
   where    
-    go :: (SysCallMap, Trace) -> Line Event -> (SysCallMap, Trace)
+    go :: (SysCallMap, Trace) -> Line -> (SysCallMap, Trace)
     go (m, ls) l@(Line pid t2 (SystemCall c2))
       | OtherSystemCall _ _ Unfinished <- c2 =
         let m' = IntMap.insert (fromEnum pid) l m in (m', ls)

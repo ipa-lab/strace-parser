@@ -46,6 +46,8 @@ import Text.ParserCombinators.ReadP (ReadP, readP_to_S)
 import Text.Printf
 import Text.Read.Lex (readHexP, readOctP)
 import System.Posix.Types
+import Data.Char
+import Data.Set qualified as Set
 
 -------------------------------------------------------------------------------
 
@@ -142,8 +144,8 @@ parseRead = do
                        <* setOffset (offset + length input - length input'))
     <$> reads input
 
-parseFlags :: Parser a -> Parser (Flags a)
-parseFlags p = p `sepBy` char '|'
+parseFlags :: Parser Flags
+parseFlags = Set.fromList <$> takeWhile1P Nothing (\s -> isAlphaNum s || s == '_') `sepBy` char '|'
 
 -- TODO: returns just a string
 -- TODO: can't handle nested structs
