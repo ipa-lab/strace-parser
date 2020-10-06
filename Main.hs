@@ -13,6 +13,7 @@ import Strace.Types
 import System.Environment
 import Text.Pretty.Simple (pPrint)
 import Text.Printf
+import System.IO
 
 -- We assume the following strace invocation:
 --
@@ -28,6 +29,8 @@ import Text.Printf
 main :: IO ()
 main = do
   [file] <- getArgs
+
+  hSetBuffering stdout NoBuffering
 
   printf "Parsing %s ... " file
   r1 <- parseRawTrace file
