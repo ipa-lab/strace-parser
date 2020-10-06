@@ -12,22 +12,23 @@ import Strace.Types
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
+import Data.Text qualified as Text
 
 parseEvents :: Trace -> Trace
 parseEvents = map $ mapEvent $ mapSystemCall parseSystemCall
 
 parseSystemCall :: SystemCall -> SystemCall
-parseSystemCall c@(OtherSystemCall name args Finished) = case name of
+parseSystemCall c@(OtherSystemCall (SystemCallName name) args Finished) = case name of
   "execve" -> parse $ Execve <$> call3 MkExecve stringLiteral stringArray stringArray maybeErrno
   "openat" -> parse $ Openat <$> call3'4 MkOpenat pDirfd stringLiteral parseFlags parseFlags (eitherErrnoOr fileDescriptor)
   "close" -> parse $ Close <$> call1 MkClose fileDescriptor maybeErrno
   "read" -> parse $ Read <$> call3 MkRead fileDescriptor stringLiteral L.decimal (eitherErrnoOr L.decimal)
-  "stat" -> parse $ Stat <$> call2 MkStat stringLiteral (optional structLiteral) maybeErrno
+  "stat" -> parse $ Stat <$> call2 MkStat stringLiteral maybeStructLiteral maybeErrno
   _ -> c
   where
     --    parse f = fromMaybe c $ parseMaybe f args
     parse f = case Text.Megaparsec.parse f "" args of
-      Left err -> trace (errorBundlePretty err) c
+      Left err -> trace ("error parsing " ++ Text.unpack name ++ ": " ++ errorBundlePretty err) c
       Right x -> x
 parseSystemCall x = x
 

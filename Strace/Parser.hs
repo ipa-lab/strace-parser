@@ -20,7 +20,7 @@ module Strace.Parser
     fileDescriptor,
     parseRead,
     parseFlags,
-    structLiteral
+    structLiteral, maybeStructLiteral
   )
 where
 
@@ -154,6 +154,9 @@ structLiteral = label "struct argument" $ do
   char '{'
   str <- manyTill anySingle (char '}')
   return $ Text.pack $ '{' : str ++ "}"
+
+maybeStructLiteral :: Parser (Maybe Text)
+maybeStructLiteral = (Just <$> structLiteral) <|> ("0x" *> L.hexadecimal *> return Nothing)
 
 -- arrayLiteral :: Parser Text
 -- arrayLiteral = label "array argument" $ do

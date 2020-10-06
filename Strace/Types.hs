@@ -46,7 +46,7 @@ data SystemCall
   | Close Close
   | Read Read_
   | Execve Execve
-  | Stat Path (Maybe StatStruct) (Maybe Errno)
+  | Stat Stat
   | OtherSystemCall SystemCallName Text SystemCallStatus
   deriving (Show)
 
@@ -60,8 +60,8 @@ data Openat = MkOpenat
   deriving (Show)
 
 data Close = MkClose
-  { fd :: FileDescriptor
-  , ret :: Maybe Errno
+  { fd :: FileDescriptor,
+    ret :: Maybe Errno
   }
   deriving (Show)
 
@@ -78,6 +78,13 @@ data Read_ = MkRead
     buf :: Text, -- TODO: ByteString?
     count :: ByteCount,
     ret :: Either Errno ByteCount
+  }
+  deriving (Show)
+
+data Stat = MkStat
+  { pathname :: Path,
+    statbuf :: Maybe StatStruct,
+    ret :: Maybe Errno
   }
   deriving (Show)
 
