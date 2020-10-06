@@ -9,8 +9,8 @@ import Data.Set (Set)
 import Data.String (IsString)
 import Data.Text (Text)
 import Data.Time.Clock.System (SystemTime)
-import System.Posix.Types
 import Data.Word
+import System.Posix.Types
 
 -- | A system trace, which is simply a list of trace lines.
 type Trace = [Line]
@@ -43,12 +43,48 @@ mapSystemCall _ ev = ev
 --
 -- See <https://man7.org/linux/man-pages/man2/syscalls.2.html>.
 data SystemCall
-  = Openat Openat
+  = OtherSystemCall SystemCallName Text SystemCallStatus
   | Close Close
-  | Read Read_
+  | Dup Dup
+  | Dup2 Dup2
+  | Dup3 Dup3
   | Execve Execve
+  | Fstat Fstat
+  | Fstatat Fstatat
+  | Lstat Lstat
+  | Openat Openat
+  | Pipe Pipe
+  | Read Read_
+  | Rmdir Rmdir
   | Stat Stat
-  | OtherSystemCall SystemCallName Text SystemCallStatus
+  | Write Write
+  deriving (Show)
+
+data Dup = MkDup
+  { oldfd :: FileDescriptor,
+    ret :: Either Errno FileDescriptor
+  }
+  deriving (Show)
+
+data Dup2 = MkDup2
+  { oldfd :: FileDescriptor,
+    newfd :: FileDescriptor,
+    ret :: Either Errno FileDescriptor
+  }
+  deriving (Show)
+
+data Dup3 = MkDup3
+  { oldfd :: FileDescriptor,
+    newfd :: FileDescriptor,
+    flags :: Flags,
+    ret :: Either Errno FileDescriptor
+  }
+  deriving (Show)
+
+data Rmdir = MkRmdir
+  { pathname :: Pointer Path,
+    ret :: Maybe Errno
+  }
   deriving (Show)
 
 data Openat = MkOpenat
@@ -85,9 +121,46 @@ data Read_ = MkRead
   }
   deriving (Show)
 
+data Write = MkWrite
+  { fd :: FileDescriptor,
+    buf :: Pointer Text, -- TODO: ByteString?
+    count :: ByteCount,
+    ret :: Either Errno ByteCount
+  }
+  deriving (Show)
+
 data Stat = MkStat
   { pathname :: Pointer Path,
     statbuf :: Pointer StatStruct,
+    ret :: Maybe Errno
+  }
+  deriving (Show)
+
+data Fstat = MkFstat
+  { fd :: FileDescriptor,
+    statbuf :: Pointer StatStruct,
+    ret :: Maybe Errno
+  }
+  deriving (Show)
+
+data Fstatat = MkFstatat
+  { dirfd :: Dirfd,
+    pathname :: Pointer Path,
+    statbuf :: Pointer StatStruct,
+    flags :: Flags,
+    ret :: Maybe Errno
+  }
+  deriving (Show)
+
+data Lstat = MkLstat
+  { pathname :: Pointer Path,
+    statbuf :: Pointer StatStruct,
+    ret :: Maybe Errno
+  }
+  deriving (Show)
+
+data Pipe = MkPipe
+  { pipefd :: Pointer [FileDescriptor],
     ret :: Maybe Errno
   }
   deriving (Show)

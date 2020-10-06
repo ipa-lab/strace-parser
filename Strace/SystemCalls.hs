@@ -20,11 +20,20 @@ parseEvents = map $ mapEvent $ mapSystemCall parseSystemCall
 
 parseSystemCall :: SystemCall -> SystemCall
 parseSystemCall c@(OtherSystemCall (SystemCallName name) args Finished) = case name of
-  "execve" -> parse $ Execve <$> call3 MkExecve (pointer stringLiteral) (pointer stringArray) (pointer stringArray) maybeErrno
-  "openat" -> parse $ Openat <$> call3'4 MkOpenat pDirfd (pointer stringLiteral) parseFlags parseFlags (eitherErrnoOr fileDescriptor)
   "close" -> parse $ Close <$> call1 MkClose fileDescriptor maybeErrno
+  "dup" -> parse $ Dup <$> call1 MkDup fileDescriptor (eitherErrnoOr fileDescriptor)
+  "dup2" -> parse $ Dup2 <$> call2 MkDup2 fileDescriptor fileDescriptor (eitherErrnoOr fileDescriptor)
+  "dup3" -> parse $ Dup3 <$> call3 MkDup3 fileDescriptor fileDescriptor parseFlags (eitherErrnoOr fileDescriptor)
+  "execve" -> parse $ Execve <$> call3 MkExecve (pointer stringLiteral) (pointer $ arrayLiteral stringLiteral) (pointer $ arrayLiteral stringLiteral) maybeErrno
+  "fstat" -> parse $ Fstat <$> call2 MkFstat fileDescriptor (pointer structLiteral) maybeErrno
+  "fstatat" -> parse $ Fstatat <$> call4 MkFstatat pDirfd (pointer stringLiteral) (pointer structLiteral) parseFlags maybeErrno
+  "lstat" -> parse $ Lstat <$> call2 MkLstat (pointer stringLiteral) (pointer structLiteral) maybeErrno
+  "openat" -> parse $ Openat <$> call3'4 MkOpenat pDirfd (pointer stringLiteral) parseFlags parseFlags (eitherErrnoOr fileDescriptor)
+  "pipe" -> parse $ Pipe <$> call1 MkPipe (pointer $ arrayLiteral fileDescriptor) maybeErrno
   "read" -> parse $ Read <$> call3 MkRead fileDescriptor (pointer stringLiteral) L.decimal (eitherErrnoOr L.decimal)
+  "rmdir" -> parse $ Rmdir <$> call1 MkRmdir (pointer stringLiteral) maybeErrno
   "stat" -> parse $ Stat <$> call2 MkStat (pointer stringLiteral) (pointer structLiteral) maybeErrno
+  "write" -> parse $ Write <$> call3 MkWrite fileDescriptor (pointer stringLiteral) L.decimal (eitherErrnoOr L.decimal)
   _ -> c
   where
     --parse f = fromMaybe c $ parseMaybe f args

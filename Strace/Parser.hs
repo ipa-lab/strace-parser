@@ -15,7 +15,7 @@ module Strace.Parser
     space1',
     parseMaybe,
     stringLiteral,
-    stringArray,
+    arrayLiteral,
     parseErrno,
     fileDescriptor,
     parseRead,
@@ -122,10 +122,10 @@ readCChar s = case s of
   (c : r) -> Just (c, r)
   [] -> Nothing
 
-stringArray :: Parser [Text]
-stringArray = do
+arrayLiteral :: Parser a -> Parser [a]
+arrayLiteral p = do
   char '['
-  elems <- stringLiteral `sepBy` ", "
+  elems <- p `sepBy` ", "
   char ']'
   return elems
 

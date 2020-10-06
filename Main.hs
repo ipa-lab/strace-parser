@@ -14,6 +14,12 @@ import System.Environment
 import Text.Pretty.Simple (pPrint)
 import Text.Printf
 import System.IO
+import Data.Map (Map)
+import Data.Map qualified as Map
+import Data.List
+import Control.Monad
+import Data.Text (Text)
+import Data.Text qualified as Text
 
 -- We assume the following strace invocation:
 --
@@ -52,3 +58,19 @@ main = do
       let numKnown = length t3 - numUnknown
 
       printf "%d known / %d unknown\n" numKnown numUnknown
+
+      let counts = countEvents t3
+      forM_ (sortOn snd $ Map.toList counts) $ \(n,c) -> printf "%20s\t%d\n" (Text.unpack n) c
+
+
+countEvents :: Trace -> Map Text Int
+countEvents = go Map.empty
+  where
+    go m ((Line _ _ (SystemCall (OtherSystemCall (SystemCallName name) _ _))):ls) = 
+      let m' = Map.alter incr name m in go m' ls
+    go m (_:ls) = go m ls
+    go m [] = m
+  
+    incr Nothing = Just 1
+    incr (Just a) = Just (a + 1)
+
