@@ -4,90 +4,51 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Common parsing types and functions.
-module Strace.Parser
-  ( Parser,
-    pid,
-    timestamp,
-    systemCallName, signalName,
-    lexeme,
-    symbol,
-    sc,
-    space1',
-    parseMaybe,
-    stringLiteral,
-    arrayLiteral,
-    parseErrno,
-    fileDescriptor,
-    parseRead,
-    parseFlags,
-    structLiteral,
-    pointer, str, path
-  )
-where
+module Strace.Parser where
 
 import Control.Monad
 import Data.Bifunctor
 import Data.Char
-import Data.Coerce
-import Data.List
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe
+import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as Text
-import Data.Text.IO qualified as Text
 import Data.Time.Clock.System
 import Data.Void
-import Data.Word
 import Strace.Types
-import System.Environment
+import System.Posix.Types
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 import Text.ParserCombinators.ReadP (ReadP, readP_to_S)
-import Text.Printf
 import Text.Read.Lex (readHexP, readOctP)
-import System.Posix.Types
-import Data.Char
-import Data.Set qualified as Set
-
--------------------------------------------------------------------------------
 
 type Parser = Parsec Void Text
 
--------------------------------------------------------------------------------
-
--- TODO: idea: lexer phase that returns only string tokens, but handles arg list, arrays, structs, maybe return value?
--- data Token 
---     = StringLiteral Text Truncation 
---     | ArrayLiteral [Token] 
---     | StructLiteral [(Text,Token)] 
---     | OtherLiteral Text
-
-
-------
-
--- syscallArg :: Parser Text
--- syscallArg =
---   choice
---     [ stringLiteral,
---       structLiteral <> (fromMaybe "" <$> (optional $ " => " <> structLiteral)),
---       arrayLiteral,
---       takeWhile1P (Just "argument") (\s -> s /= ',' && s /= ')' && s /= '<' && s /= '\n')
---     ]
-
-stringLiteral :: Parser Text
-stringLiteral = label "string" $ Text.pack <$> (char '"' *> manyTill cLiteral (char '"'))
-
 str :: Parser Str
 str = do
-  str <- stringLiteral
+  str <- quotedString '"' '"'
   ellipsis <- optional "..."
   if isJust ellipsis
     then return $ Truncated str
     else return $ Complete str
 
 path :: Parser Path
-path = Path <$> stringLiteral
+path = Path <$> quotedString '"' '"'
+
+fileDescriptor :: Parser FileDescriptor
+fileDescriptor = do
+  fd <- L.signed (pure ()) L.decimal
+  path <- optional $ Path <$> quotedString '<' '>'
+  return $ FileDescriptor fd path
+
+pDirfd :: Parser Dirfd
+pDirfd = ("AT_FDCWD" *> return AT_FDCWD) <|> Dirfd <$> fileDescriptor
+
+quotedString :: Char -> Char -> Parser Text
+quotedString open close = label "string" $ 
+  Text.pack <$> (char open *> manyTill cLiteral (char close))
 
 cLiteral :: Parser Char
 cLiteral = do
@@ -129,47 +90,25 @@ readCChar s = case s of
   (c : r) -> Just (c, r)
   [] -> Nothing
 
-arrayLiteral :: Parser a -> Parser [a]
-arrayLiteral p = do
-  char '['
-  elems <- p `sepBy` ", "
-  char ']'
-  return elems
+arrayOf :: Parser a -> Parser [a]
+arrayOf p = char '[' *> p `sepBy` ", " <* char ']'
 
-pointer :: Parser a -> Parser (Pointer a)
-pointer p = (Pointer <$> ("0x" *> L.hexadecimal)) <|> (Deref <$> p)
+pointerTo :: Parser a -> Parser (Pointer a)
+pointerTo p = (Pointer <$> ("0x" *> L.hexadecimal)) <|> (Deref <$> p)
 
 parseErrno :: Parser Errno
 parseErrno = Errno <$> takeWhile1P Nothing isAsciiUpper
-
-
--- based on https://stackoverflow.com/a/54391219
--- TODO: this might not be very efficient...
-parseRead :: Read a => Parser a
-parseRead = do
-  input <- Text.unpack <$> getInput
-  offset <- getOffset
-  choice $
-    (\(a, input') -> a <$ setInput (Text.pack input')
-                       <* setOffset (offset + length input - length input'))
-    <$> reads input
 
 parseFlags :: Parser Flags
 parseFlags = Set.fromList <$> takeWhile1P Nothing (\s -> isAlphaNum s || s == '_') `sepBy` char '|'
 
 -- TODO: returns just a string
 -- TODO: can't handle nested structs
-structLiteral :: Parser Text
-structLiteral = label "struct argument" $ do
+struct :: Parser Text
+struct = label "struct argument" $ do
   char '{'
   str <- manyTill anySingle (char '}')
   return $ Text.pack $ '{' : str ++ "}"
-
--- arrayLiteral :: Parser Text
--- arrayLiteral = label "array argument" $ do
---   char '['
---   str <- manyTill anySingle (char ']')
---   return $ Text.pack $ '[' : str ++ "]"
 
 pid :: Parser ProcessID
 pid = L.decimal
@@ -186,12 +125,6 @@ systemCallName = SystemCallName <$> takeWhile1P (Just "system call name") (\s ->
 
 signalName :: Parser SignalName
 signalName = SignalName <$> takeWhile1P (Just "signal name") isAsciiUpper
-
-fileDescriptor :: Parser FileDescriptor
-fileDescriptor = do
-  fd <- L.signed (pure ()) L.decimal
-  path <- optional $ Path <$> (char '<' *> (Text.pack <$> manyTill cLiteral (char '>')))
-  return $ FileDescriptor fd path
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc

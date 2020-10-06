@@ -6,14 +6,14 @@
 module Strace.SystemCalls (parseEvents) where
 
 import Control.Applicative
+import Data.Maybe
+import Data.Text qualified as Text
 import Debug.Trace
 import Strace.Parser
 import Strace.Types
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
-import Data.Text qualified as Text
-import Data.Maybe
 
 parseEvents :: Trace -> Trace
 parseEvents = map $ mapEvent $ mapSystemCall parseSystemCall
@@ -24,16 +24,16 @@ parseSystemCall c@(OtherSystemCall (SystemCallName name) args Finished) = case n
   "dup" -> parse $ Dup <$> call1 MkDup fileDescriptor (eitherErrnoOr fileDescriptor)
   "dup2" -> parse $ Dup2 <$> call2 MkDup2 fileDescriptor fileDescriptor (eitherErrnoOr fileDescriptor)
   "dup3" -> parse $ Dup3 <$> call3 MkDup3 fileDescriptor fileDescriptor parseFlags (eitherErrnoOr fileDescriptor)
-  "execve" -> parse $ Execve <$> call3 MkExecve (pointer path) (pointer $ arrayLiteral str) (pointer $ arrayLiteral str) maybeErrno
-  "fstat" -> parse $ Fstat <$> call2 MkFstat fileDescriptor (pointer structLiteral) maybeErrno
-  "fstatat" -> parse $ Fstatat <$> call4 MkFstatat pDirfd (pointer path) (pointer structLiteral) parseFlags maybeErrno
-  "lstat" -> parse $ Lstat <$> call2 MkLstat (pointer path) (pointer structLiteral) maybeErrno
-  "openat" -> parse $ Openat <$> call3'4 MkOpenat pDirfd (pointer path) parseFlags parseFlags (eitherErrnoOr fileDescriptor)
-  "pipe" -> parse $ Pipe <$> call1 MkPipe (pointer $ arrayLiteral fileDescriptor) maybeErrno
-  "read" -> parse $ Read <$> call3 MkRead fileDescriptor (pointer str) L.decimal (eitherErrnoOr L.decimal)
-  "rmdir" -> parse $ Rmdir <$> call1 MkRmdir (pointer path) maybeErrno
-  "stat" -> parse $ Stat <$> call2 MkStat (pointer path) (pointer structLiteral) maybeErrno
-  "write" -> parse $ Write <$> call3 MkWrite fileDescriptor (pointer str) L.decimal (eitherErrnoOr L.decimal)
+  "execve" -> parse $ Execve <$> call3 MkExecve (pointerTo path) (pointerTo (arrayOf str)) (pointerTo (arrayOf str)) maybeErrno
+  "fstat" -> parse $ Fstat <$> call2 MkFstat fileDescriptor (pointerTo struct) maybeErrno
+  "fstatat" -> parse $ Fstatat <$> call4 MkFstatat pDirfd (pointerTo path) (pointerTo struct) parseFlags maybeErrno
+  "lstat" -> parse $ Lstat <$> call2 MkLstat (pointerTo path) (pointerTo struct) maybeErrno
+  "openat" -> parse $ Openat <$> call3'4 MkOpenat pDirfd (pointerTo path) parseFlags parseFlags (eitherErrnoOr fileDescriptor)
+  "pipe" -> parse $ Pipe <$> call1 MkPipe (pointerTo (arrayOf fileDescriptor)) maybeErrno
+  "read" -> parse $ Read <$> call3 MkRead fileDescriptor (pointerTo str) L.decimal (eitherErrnoOr L.decimal)
+  "rmdir" -> parse $ Rmdir <$> call1 MkRmdir (pointerTo path) maybeErrno
+  "stat" -> parse $ Stat <$> call2 MkStat (pointerTo path) (pointerTo struct) maybeErrno
+  "write" -> parse $ Write <$> call3 MkWrite fileDescriptor (pointerTo str) L.decimal (eitherErrnoOr L.decimal)
   _ -> c
   where
     --parse f = fromMaybe c $ parseMaybe f args
@@ -129,6 +129,3 @@ call4 f p1 p2 p3 p4 pr = do
   a4 <- ", " *> p4
   r <- ")" *> hspace1 *> "=" *> hspace1 *> pr
   return $ f a1 a2 a3 a4 r
-
-pDirfd :: Parser Dirfd
-pDirfd = ("AT_FDCWD" *> return AT_FDCWD) <|> Dirfd <$> fileDescriptor
