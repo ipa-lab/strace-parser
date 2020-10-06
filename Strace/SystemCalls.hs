@@ -13,20 +13,21 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 import Data.Text qualified as Text
+import Data.Maybe
 
 parseEvents :: Trace -> Trace
 parseEvents = map $ mapEvent $ mapSystemCall parseSystemCall
 
 parseSystemCall :: SystemCall -> SystemCall
 parseSystemCall c@(OtherSystemCall (SystemCallName name) args Finished) = case name of
-  "execve" -> parse $ Execve <$> call3 MkExecve stringLiteral stringArray stringArray maybeErrno
-  "openat" -> parse $ Openat <$> call3'4 MkOpenat pDirfd stringLiteral parseFlags parseFlags (eitherErrnoOr fileDescriptor)
+  "execve" -> parse $ Execve <$> call3 MkExecve (pointer stringLiteral) (pointer stringArray) (pointer stringArray) maybeErrno
+  "openat" -> parse $ Openat <$> call3'4 MkOpenat pDirfd (pointer stringLiteral) parseFlags parseFlags (eitherErrnoOr fileDescriptor)
   "close" -> parse $ Close <$> call1 MkClose fileDescriptor maybeErrno
-  "read" -> parse $ Read <$> call3 MkRead fileDescriptor stringLiteral L.decimal (eitherErrnoOr L.decimal)
-  "stat" -> parse $ Stat <$> call2 MkStat stringLiteral maybeStructLiteral maybeErrno
+  "read" -> parse $ Read <$> call3 MkRead fileDescriptor (pointer stringLiteral) L.decimal (eitherErrnoOr L.decimal)
+  "stat" -> parse $ Stat <$> call2 MkStat (pointer stringLiteral) (pointer structLiteral) maybeErrno
   _ -> c
   where
-    --    parse f = fromMaybe c $ parseMaybe f args
+    --parse f = fromMaybe c $ parseMaybe f args
     parse f = case Text.Megaparsec.parse f "" args of
       Left err -> trace ("error parsing " ++ Text.unpack name ++ ": " ++ errorBundlePretty err) c
       Right x -> x

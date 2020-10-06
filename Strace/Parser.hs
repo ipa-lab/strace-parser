@@ -20,7 +20,8 @@ module Strace.Parser
     fileDescriptor,
     parseRead,
     parseFlags,
-    structLiteral, maybeStructLiteral
+    structLiteral,
+    pointer
   )
 where
 
@@ -78,7 +79,7 @@ stringLiteral :: Parser Text
 stringLiteral = label "string argument" $ do
   char '"'
   str <- manyTill cLiteral (char '"')
-  optional "..."
+  optional "..."  -- TODO: don't swallow this silently
   return $ Text.pack str
 
 cLiteral :: Parser Char
@@ -128,6 +129,8 @@ stringArray = do
   char ']'
   return elems
 
+pointer :: Parser a -> Parser (Pointer a)
+pointer p = (Pointer <$> ("0x" *> L.hexadecimal)) <|> (Deref <$> p)
 
 parseErrno :: Parser Errno
 parseErrno = Errno <$> takeWhile1P Nothing isAsciiUpper
@@ -155,9 +158,6 @@ structLiteral = label "struct argument" $ do
   str <- manyTill anySingle (char '}')
   return $ Text.pack $ '{' : str ++ "}"
 
-maybeStructLiteral :: Parser (Maybe Text)
-maybeStructLiteral = (Just <$> structLiteral) <|> ("0x" *> L.hexadecimal *> return Nothing)
-
 -- arrayLiteral :: Parser Text
 -- arrayLiteral = label "array argument" $ do
 --   char '['
@@ -182,9 +182,8 @@ signalName = SignalName <$> takeWhile1P (Just "signal name") isAsciiUpper
 
 fileDescriptor :: Parser FileDescriptor
 fileDescriptor = do
-  fd <- L.decimal
-  "<"
-  path <- Text.pack <$> manyTill cLiteral (char '>')  
+  fd <- L.signed (pure ()) L.decimal
+  path <- optional $ char '<' *> (Text.pack <$> manyTill cLiteral (char '>'))
   return $ FileDescriptor fd path
 
 lexeme :: Parser a -> Parser a

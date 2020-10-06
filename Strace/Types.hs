@@ -10,6 +10,7 @@ import Data.String (IsString)
 import Data.Text (Text)
 import Data.Time.Clock.System (SystemTime)
 import System.Posix.Types
+import Data.Word
 
 -- | A system trace, which is simply a list of trace lines.
 type Trace = [Line]
@@ -52,11 +53,14 @@ data SystemCall
 
 data Openat = MkOpenat
   { dirfd :: Dirfd,
-    pathname :: Path,
+    pathname :: Pointer Path,
     flags :: Flags,
     mode :: Maybe Flags,
     ret :: Either Errno FileDescriptor
   }
+  deriving (Show)
+
+data Pointer a = Pointer Word64 | Deref a
   deriving (Show)
 
 data Close = MkClose
@@ -66,24 +70,24 @@ data Close = MkClose
   deriving (Show)
 
 data Execve = MkExecve
-  { pathname :: Path,
-    argv :: [Text],
-    envp :: [Text],
+  { pathname :: Pointer Path,
+    argv :: Pointer [Text],
+    envp :: Pointer [Text],
     ret :: Maybe Errno
   }
   deriving (Show)
 
 data Read_ = MkRead
   { fd :: FileDescriptor,
-    buf :: Text, -- TODO: ByteString?
+    buf :: Pointer Text, -- TODO: ByteString?
     count :: ByteCount,
     ret :: Either Errno ByteCount
   }
   deriving (Show)
 
 data Stat = MkStat
-  { pathname :: Path,
-    statbuf :: Maybe StatStruct,
+  { pathname :: Pointer Path,
+    statbuf :: Pointer StatStruct,
     ret :: Maybe Errno
   }
   deriving (Show)
@@ -108,7 +112,7 @@ newtype Errno = Errno Text
 type Path = Text
 
 -- | A file descriptor.
-data FileDescriptor = FileDescriptor Fd Path
+data FileDescriptor = FileDescriptor Fd (Maybe Path)
   deriving (Show)
 
 -- | A directory file descriptor.
