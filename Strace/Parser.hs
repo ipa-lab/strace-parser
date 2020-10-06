@@ -21,7 +21,7 @@ module Strace.Parser
     parseRead,
     parseFlags,
     structLiteral,
-    pointer
+    pointer, str, path
   )
 where
 
@@ -76,11 +76,18 @@ type Parser = Parsec Void Text
 --     ]
 
 stringLiteral :: Parser Text
-stringLiteral = label "string argument" $ do
-  char '"'
-  str <- manyTill cLiteral (char '"')
-  optional "..."  -- TODO: don't swallow this silently
-  return $ Text.pack str
+stringLiteral = label "string" $ Text.pack <$> (char '"' *> manyTill cLiteral (char '"'))
+
+str :: Parser Str
+str = do
+  str <- stringLiteral
+  ellipsis <- optional "..."
+  if isJust ellipsis
+    then return $ Truncated str
+    else return $ Complete str
+
+path :: Parser Path
+path = Path <$> stringLiteral
 
 cLiteral :: Parser Char
 cLiteral = do
@@ -183,7 +190,7 @@ signalName = SignalName <$> takeWhile1P (Just "signal name") isAsciiUpper
 fileDescriptor :: Parser FileDescriptor
 fileDescriptor = do
   fd <- L.signed (pure ()) L.decimal
-  path <- optional $ char '<' *> (Text.pack <$> manyTill cLiteral (char '>'))
+  path <- optional $ Path <$> (char '<' *> (Text.pack <$> manyTill cLiteral (char '>')))
   return $ FileDescriptor fd path
 
 lexeme :: Parser a -> Parser a

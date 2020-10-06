@@ -107,15 +107,15 @@ data Close = MkClose
 
 data Execve = MkExecve
   { pathname :: Pointer Path,
-    argv :: Pointer [Text],
-    envp :: Pointer [Text],
+    argv :: Pointer [Str],
+    envp :: Pointer [Str],
     ret :: Maybe Errno
   }
   deriving (Show)
 
 data Read_ = MkRead
   { fd :: FileDescriptor,
-    buf :: Pointer Text, -- TODO: ByteString?
+    buf :: Pointer Str, -- TODO: ByteString?
     count :: ByteCount,
     ret :: Either Errno ByteCount
   }
@@ -123,7 +123,7 @@ data Read_ = MkRead
 
 data Write = MkWrite
   { fd :: FileDescriptor,
-    buf :: Pointer Text, -- TODO: ByteString?
+    buf :: Pointer Str, -- TODO: ByteString?
     count :: ByteCount,
     ret :: Either Errno ByteCount
   }
@@ -165,6 +165,10 @@ data Pipe = MkPipe
   }
   deriving (Show)
 
+-- | A possibly truncated string.
+data Str = Complete Text | Truncated Text
+  deriving (Show)
+
 -- | The name of a system call.
 newtype SystemCallName = SystemCallName Text
   deriving (Eq, Ord, Show, IsString)
@@ -181,8 +185,9 @@ data SystemCallStatus = Finished | Unfinished | Resumed
 newtype Errno = Errno Text
   deriving (Eq, Ord, Show, IsString)
 
--- | A file system path name.
-type Path = Text
+-- | A file system path.
+newtype Path = Path Text
+  deriving (Show)
 
 -- | A file descriptor.
 data FileDescriptor = FileDescriptor Fd (Maybe Path)
