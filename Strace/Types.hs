@@ -30,7 +30,7 @@ mapEvent f (Line pid t ev) = Line pid t (f ev)
 -- | A system event.
 data Event
   = SystemCall SystemCall
-  | Signal SignalName SigInfo
+  | Signal SignalName Text
   | Killed SignalName
   | Exit Int
   deriving (Show)
@@ -131,14 +131,14 @@ data Write = MkWrite
 
 data Stat = MkStat
   { pathname :: Pointer Path,
-    statbuf :: Pointer StatStruct,
+    statbuf :: Pointer Text,
     ret :: Maybe Errno
   }
   deriving (Show)
 
 data Fstat = MkFstat
   { fd :: FileDescriptor,
-    statbuf :: Pointer StatStruct,
+    statbuf :: Pointer Text,
     ret :: Maybe Errno
   }
   deriving (Show)
@@ -146,7 +146,7 @@ data Fstat = MkFstat
 data Fstatat = MkFstatat
   { dirfd :: Dirfd,
     pathname :: Pointer Path,
-    statbuf :: Pointer StatStruct,
+    statbuf :: Pointer Text,
     flags :: Flags,
     ret :: Maybe Errno
   }
@@ -154,7 +154,7 @@ data Fstatat = MkFstatat
 
 data Lstat = MkLstat
   { pathname :: Pointer Path,
-    statbuf :: Pointer StatStruct,
+    statbuf :: Pointer Text,
     ret :: Maybe Errno
   }
   deriving (Show)
@@ -197,13 +197,6 @@ data FileDescriptor = FileDescriptor Fd (Maybe Path)
 -- See <https://man7.org/linux/man-pages/man2/openat.2.html>.
 data Dirfd = AT_FDCWD | Dirfd FileDescriptor
   deriving (Show)
-
-type Mode = Flags
-
-type StatStruct = Text -- TODO
-
--- | See <https://man7.org/linux/man-pages/man2/sigaction.2.html>.
-type SigInfo = Text -- TODO
 
 -- | A set of symbolicated flag arguments.
 type Flags = Set Text
