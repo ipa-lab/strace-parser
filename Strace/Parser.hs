@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- | Common parsing types and functions.
 module Strace.Parser where
@@ -18,13 +19,12 @@ import Data.Time.Clock.System
 import Data.Void
 import Strace.Types
 import System.Posix.Types
-import Text.Megaparsec
-import Text.Megaparsec.Char
-import Text.Megaparsec.Char.Lexer qualified as L
-import Text.ParserCombinators.ReadP (ReadP, readP_to_S)
+import Control.Applicative
+import Text.ParserCombinators.ReadP (readP_to_S)
 import Text.Read.Lex (readHexP, readOctP)
-
-type Parser = Parsec Void Text
+import Data.Attoparsec.Text
+import Data.Attoparsec.Combinator
+import Data.List
 
 str :: Parser Str
 str = do
@@ -39,7 +39,7 @@ path = Path <$> quotedString '"' '"'
 
 fileDescriptor :: Parser FileDescriptor
 fileDescriptor = do
-  fd <- L.signed (pure ()) L.decimal
+  fd <- signed decimal
   path <- optional $ Path <$> quotedString '<' '>'
   return $ FileDescriptor fd path
 
@@ -47,15 +47,42 @@ pDirfd :: Parser Dirfd
 pDirfd = ("AT_FDCWD" *> return AT_FDCWD) <|> Dirfd <$> fileDescriptor
 
 quotedString :: Char -> Char -> Parser Text
-quotedString open close = label "string" $ 
+quotedString open close =
   Text.pack <$> (char open *> manyTill cLiteral (char close))
+
+-- TODO: C string parsing could probably be vastly simplified
+-- 1) we could assume hex-only strings (and always 1 byte per char i.e. \xhh)
+-- 2) we could assume ASCII and use ByteStrings and push further decoding upstream
+-- 3) maybe: use ByteStrings/Char8 and only look for escaped quote?
 
 cLiteral :: Parser Char
 cLiteral = do
-  s <- lookAhead (count' 1 10 anySingle)
+  s <- lookAhead (count' 1 10 anyChar)
   case readCChar s of
-    Just (c, r) -> c <$ skipCount (length s - length r) anySingle
-    Nothing -> unexpected (Tokens (head s :| []))
+    Just (c, r) -> c <$ Data.Attoparsec.Text.take (length s - length r)
+    Nothing -> fail $ "unexpected: " ++ s
+
+count' :: MonadPlus m => Int -> Int -> m a -> m [a]
+count' m' n' p =
+  if n' > 0 && n' >= m'
+    then gom id m'
+    else return []
+  where
+    gom f !m =
+      if m > 0
+        then do
+          x <- p
+          gom (f . (x:)) (m - 1)
+        else god f (if m' <= 0 then n' else n' - m')
+    god f !d =
+      if d > 0
+        then do
+          r <- optional p
+          case r of
+            Nothing -> return (f [])
+            Just  x -> god (f . (x:)) (d - 1)
+        else return (f [])
+{-# INLINE count' #-}
 
 readCChar :: String -> Maybe (Char, String)
 readCChar s = case s of
@@ -75,15 +102,15 @@ readCChar s = case s of
     -- hexadecimals: \xhh... (variable length)
     'x' -> fmap (first chr) $ listToMaybe $ readP_to_S readHexP r
     -- hexadecimal unicode code points (below 10000): \uhhhh
-    'u' | length r >= 4 -> case listToMaybe $ readP_to_S readHexP $ take 4 r of
+    'u' | length r >= 4 -> case listToMaybe $ readP_to_S readHexP $ Data.List.take 4 r of
       Just (n, []) -> Just (chr n, drop 4 r)
       _ -> Nothing
     -- hexadecimal unicode code points: \Uhhhhhhhh
-    'U' | length r >= 8 -> case listToMaybe $ readP_to_S readHexP $ take 8 r of
+    'U' | length r >= 8 -> case listToMaybe $ readP_to_S readHexP $ Data.List.take 8 r of
       Just (n, []) -> Just (chr n, drop 8 r)
       _ -> Nothing
     -- octal numerals: \n or \nn or \nnn
-    x | isOctDigit x -> case listToMaybe $ readP_to_S readOctP $ take 3 (x : r) of
+    x | isOctDigit x -> case listToMaybe $ readP_to_S readOctP $ Data.List.take 3 (x : r) of
       Just (n, t) -> Just (chr n, t ++ drop 3 (x : r))
       Nothing -> Nothing
     _ -> Nothing
@@ -94,46 +121,38 @@ arrayOf :: Parser a -> Parser [a]
 arrayOf p = char '[' *> p `sepBy` ", " <* char ']'
 
 pointerTo :: Parser a -> Parser (Pointer a)
-pointerTo p = (Pointer <$> ("0x" *> L.hexadecimal)) <|> (Deref <$> p)
+pointerTo p = (Pointer <$> ("0x" *> hexadecimal)) <|> (Deref <$> p)
 
 parseErrno :: Parser Errno
-parseErrno = Errno <$> takeWhile1P Nothing isAsciiUpper
+parseErrno = Errno <$> takeWhile1 isAsciiUpper
 
 parseFlags :: Parser Flags
-parseFlags = Set.fromList <$> takeWhile1P Nothing (\s -> isAlphaNum s || s == '_') `sepBy` char '|'
+parseFlags = Set.fromList <$> takeWhile1 (\s -> isAlphaNum s || s == '_') `sepBy` char '|'
 
 -- TODO: returns just a string
 -- TODO: can't handle nested structs
 struct :: Parser Text
-struct = label "struct argument" $ do
+struct = do
   char '{'
-  str <- manyTill anySingle (char '}')
-  return $ Text.pack $ '{' : str ++ "}"
+  str <- takeTill (== '}')
+  char '}'
+  return $ '{' `Text.cons` str `Text.snoc` '}'
 
 pid :: Parser ProcessID
-pid = L.decimal
+pid = decimal
 
 timestamp :: Parser SystemTime
 timestamp = do
-  s <- L.decimal
+  s <- decimal
   "."
-  ms <- L.decimal
+  ms <- decimal
   return $ MkSystemTime s (ms * 1000)
 
 systemCallName :: Parser SystemCallName
-systemCallName = SystemCallName <$> takeWhile1P (Just "system call name") (\s -> isAlphaNum s || s == '_')
+systemCallName = SystemCallName <$> takeWhile1 (\s -> isAlphaNum s || s == '_')
 
 signalName :: Parser SignalName
-signalName = SignalName <$> takeWhile1P (Just "signal name") isAsciiUpper
+signalName = SignalName <$> takeWhile1 isAsciiUpper
 
-lexeme :: Parser a -> Parser a
-lexeme = L.lexeme sc
-
-symbol :: Text -> Parser Text
-symbol = L.symbol sc
-
-sc :: Parser ()
-sc = L.space space1' empty empty
-
-space1' :: Parser ()
-space1' = void $ takeWhile1P (Just "white space") (== ' ')
+skipHorizontalSpace :: Parser ()
+skipHorizontalSpace = skipWhile isHorizontalSpace

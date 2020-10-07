@@ -11,9 +11,8 @@ import Data.Text qualified as Text
 import Debug.Trace
 import Strace.Parser
 import Strace.Types
-import Text.Megaparsec
-import Text.Megaparsec.Char
-import Text.Megaparsec.Char.Lexer qualified as L
+import Data.Attoparsec.Text
+import Data.Attoparsec.Combinator
 
 parseEvents :: Trace -> Trace
 parseEvents = map $ mapEvent $ mapSystemCall parseSystemCall
@@ -30,20 +29,21 @@ parseSystemCall c@(OtherSystemCall (SystemCallName name) args Finished) = case n
   "lstat" -> parse $ Lstat <$> call2 MkLstat (pointerTo path) (pointerTo struct) maybeErrno
   "openat" -> parse $ Openat <$> call3'4 MkOpenat pDirfd (pointerTo path) parseFlags parseFlags (eitherErrnoOr fileDescriptor)
   "pipe" -> parse $ Pipe <$> call1 MkPipe (pointerTo (arrayOf fileDescriptor)) maybeErrno
-  "read" -> parse $ Read <$> call3 MkRead fileDescriptor (pointerTo str) L.decimal (eitherErrnoOr L.decimal)
+  "read" -> parse $ Read <$> call3 MkRead fileDescriptor (pointerTo str) decimal (eitherErrnoOr decimal)
   "rmdir" -> parse $ Rmdir <$> call1 MkRmdir (pointerTo path) maybeErrno
   "stat" -> parse $ Stat <$> call2 MkStat (pointerTo path) (pointerTo struct) maybeErrno
-  "write" -> parse $ Write <$> call3 MkWrite fileDescriptor (pointerTo str) L.decimal (eitherErrnoOr L.decimal)
+  "write" -> parse $ Write <$> call3 MkWrite fileDescriptor (pointerTo str) decimal (eitherErrnoOr decimal)
   _ -> c
   where
     --parse f = fromMaybe c $ parseMaybe f args
-    parse f = case Text.Megaparsec.parse f "" args of
-      Left err -> trace ("error parsing " ++ Text.unpack name ++ ": " ++ errorBundlePretty err) c
+    parse f = case parseOnly f args of
+      Left err -> trace ("error parsing " ++ Text.unpack name ++ ": " ++ err) c
       Right x -> x
 parseSystemCall x = x
 
 eitherErrnoOr :: Parser a -> Parser (Either Errno a)
-eitherErrnoOr p = (lexeme "-1" *> (Left <$> parseErrno) <* takeRest) <|> (Right <$> p)
+eitherErrnoOr p = 
+  ("-1" *> skipHorizontalSpace *> (Left <$> parseErrno) <* takeText) <|> (Right <$> p)
 
 maybeErrno :: Parser (Maybe Errno)
 maybeErrno = either Just (const Nothing) <$> eitherErrnoOr "0"
@@ -55,7 +55,7 @@ call1 ::
   Parser b
 call1 f p1 pr = do
   a1 <- "(" *> p1
-  r <- ")" *> hspace1 *> "=" *> hspace1 *> pr
+  r <- ")" *> skipHorizontalSpace *> "=" *> skipHorizontalSpace *> pr
   return $ f a1 r
 
 call2 ::
@@ -67,7 +67,7 @@ call2 ::
 call2 f p1 p2 pr = do
   a1 <- "(" *> p1
   a2 <- ", " *> p2
-  r <- ")" *> hspace1 *> "=" *> hspace1 *> pr
+  r <- ")" *> skipHorizontalSpace *> "=" *> skipHorizontalSpace *> pr
   return $ f a1 a2 r
 
 call2'3 ::
@@ -81,7 +81,7 @@ call2'3 f p1 p2 p3 pr = do
   a1 <- "(" *> p1
   a2 <- ", " *> p2
   a3 <- optional $ ", " *> p3
-  r <- ")" *> hspace1 *> "=" *> hspace1 *> pr
+  r <- ")" *> skipHorizontalSpace *> "=" *> skipHorizontalSpace *> pr
   return $ f a1 a2 a3 r
 
 call3 ::
@@ -95,7 +95,7 @@ call3 f p1 p2 p3 pr = do
   a1 <- "(" *> p1
   a2 <- ", " *> p2
   a3 <- ", " *> p3
-  r <- ")" *> hspace1 *> "=" *> hspace1 *> pr
+  r <- ")" *> skipHorizontalSpace *> "=" *> skipHorizontalSpace *> pr
   return $ f a1 a2 a3 r
 
 call3'4 ::
@@ -111,7 +111,7 @@ call3'4 f p1 p2 p3 p4 pr = do
   a2 <- ", " *> p2
   a3 <- ", " *> p3
   a4 <- optional $ ", " *> p4
-  r <- ")" *> hspace1 *> "=" *> hspace1 *> pr
+  r <- ")" *> skipHorizontalSpace *> "=" *> skipHorizontalSpace *> pr
   return $ f a1 a2 a3 a4 r
 
 call4 ::
@@ -127,5 +127,5 @@ call4 f p1 p2 p3 p4 pr = do
   a2 <- ", " *> p2
   a3 <- ", " *> p3
   a4 <- ", " *> p4
-  r <- ")" *> hspace1 *> "=" *> hspace1 *> pr
+  r <- ")" *> skipHorizontalSpace *> "=" *> skipHorizontalSpace *> pr
   return $ f a1 a2 a3 a4 r
