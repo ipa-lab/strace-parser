@@ -9,12 +9,12 @@ module Strace.Parser where
 
 import Control.Applicative
 import Control.Monad
-import Data.Attoparsec.Text
+import Data.Attoparsec.ByteString.Char8
+import Data.ByteString.Char8 (ByteString)
+import Data.ByteString.Char8 qualified as BS
 import Data.Char
 import Data.Maybe
 import Data.Set qualified as Set
-import Data.Text (Text)
-import Data.Text qualified as Text
 import Data.Time.Clock.System
 import Strace.Types
 import System.Posix.Types
@@ -40,7 +40,7 @@ fileDescriptor = do
 pDirfd :: Parser Dirfd
 pDirfd = ("AT_FDCWD" *> return AT_FDCWD) <|> Dirfd <$> fileDescriptor
 
-quotedString :: Parser Text
+quotedString :: Parser ByteString
 quotedString = do
   char '"'
   go
@@ -52,8 +52,8 @@ quotedString = do
         then return str
         else do
           c2 <- anyChar
-          let str' = if c2 == '"' then str `Text.snoc` c2 else str `Text.snoc` c1 `Text.snoc` c2
-          liftA2 Text.append (return str') go
+          let str' = if c2 == '"' then str `BS.snoc` c2 else str `BS.snoc` c1 `BS.snoc` c2
+          liftA2 BS.append (return str') go
 
 arrayOf :: Parser a -> Parser [a]
 arrayOf p = char '[' *> p `sepBy` ", " <* char ']'
@@ -67,11 +67,11 @@ parseErrno = Errno <$> takeWhile1 isAsciiUpper
 parseFlags :: Parser Flags
 parseFlags = Set.fromList <$> takeWhile1 (\s -> isAlphaNum s || s == '_') `sepBy` char '|'
 
-struct :: Parser Text
+struct :: Parser ByteString
 struct = do
   char '{'
   str <- go
-  return $ '{' `Text.cons` str
+  return $ '{' `BS.cons` str
   where
     go = do
       str1 <- takeWhile (\c -> c /= '"' && c /= '{' && c /= '}')
@@ -80,14 +80,14 @@ struct = do
         '"' -> do
           str2 <- quotedString
           str3 <- go
-          return $ str1 <> ('"' `Text.cons` str2 `Text.snoc` '"') <> str3
-        '{' -> do          
+          return $ str1 <> (('"' `BS.cons` str2) `BS.snoc` '"') <> str3
+        '{' -> do
           str2 <- struct
           str3 <- go
           return $ str1 <> str2 <> str3
         '}' -> do
           char '}'
-          return $ str1 `Text.snoc` '}'
+          return $ str1 `BS.snoc` '}'
         _ -> fail "impossible"
 
 pid :: Parser ProcessID
@@ -107,4 +107,4 @@ signalName :: Parser SignalName
 signalName = SignalName <$> takeWhile1 isAsciiUpper
 
 skipHorizontalSpace :: Parser ()
-skipHorizontalSpace = skipWhile isHorizontalSpace
+skipHorizontalSpace = skipWhile (\c -> c == ' ' || c == '\t')

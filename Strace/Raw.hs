@@ -4,18 +4,15 @@
 module Strace.Raw (parseRawTrace) where
 
 import Control.Monad
-import Data.Bifunctor
-import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
 import Strace.Parser
 import Strace.Types
-import Data.Attoparsec.Text
-import Data.Attoparsec.Combinator
+import Data.Attoparsec.ByteString.Char8
 import Control.Applicative
 import Prelude hiding (takeWhile)
+import qualified Data.ByteString.Char8 as BS
 
 parseRawTrace :: FilePath -> IO (Either String Trace)
-parseRawTrace file = parseOnly trace <$> Text.readFile file
+parseRawTrace file = parseOnly trace <$> BS.readFile file
 
 trace :: Parser Trace
 trace = line `manyTill` endOfInput
@@ -41,7 +38,7 @@ signal = do
   "--- "
   name <- signalName
   skipHorizontalSpace
-  info <- Text.pack <$> manyTill anyChar " ---"
+  info <- BS.pack <$> manyTill anyChar " ---"
   return $ Signal name info
 
 systemCallResumed :: Parser Event
@@ -57,7 +54,7 @@ systemCall = do
   name <- systemCallName
   skipHorizontalSpace
   line <- takeWhile (/= '\n')
-  let syscall = case Text.stripSuffix " <unfinished ...>" line of
+  let syscall = case BS.stripSuffix " <unfinished ...>" line of
         Nothing -> OtherSystemCall name line Finished
         Just line' -> OtherSystemCall name line' Unfinished
   return $ SystemCall syscall

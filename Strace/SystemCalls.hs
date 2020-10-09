@@ -6,13 +6,11 @@
 module Strace.SystemCalls (parseEvents) where
 
 import Control.Applicative
-import Data.Maybe
-import Data.Text qualified as Text
+import Data.Attoparsec.ByteString.Char8
+import Data.ByteString.Char8 qualified as BS
 import Debug.Trace
 import Strace.Parser
 import Strace.Types
-import Data.Attoparsec.Text
-import Data.Attoparsec.Combinator
 
 parseEvents :: Trace -> Trace
 parseEvents = map $ mapEvent $ mapSystemCall parseSystemCall
@@ -40,13 +38,13 @@ parseSystemCall c@(OtherSystemCall (SystemCallName name) args Finished) = case n
   where
     --parse f = fromMaybe c $ parseMaybe f args
     parse f = case parseOnly f args of
-      Left err -> trace ("error parsing " ++ Text.unpack name ++ ": " ++ err) c
+      Left err -> trace ("error parsing " ++ BS.unpack name ++ ": " ++ err) c
       Right x -> x
 parseSystemCall x = x
 
 eitherErrnoOr :: Parser a -> Parser (Either Errno a)
-eitherErrnoOr p = 
-  ("-1" *> skipHorizontalSpace *> (Left <$> parseErrno) <* takeText) <|> (Right <$> p)
+eitherErrnoOr p =
+  ("-1" *> skipHorizontalSpace *> (Left <$> parseErrno) <* takeByteString) <|> (Right <$> p)
 
 maybeErrno :: Parser (Maybe Errno)
 maybeErrno = either Just (const Nothing) <$> eitherErrnoOr "0"

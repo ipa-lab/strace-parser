@@ -7,10 +7,10 @@ module Strace.Types where
 
 import Data.Set (Set)
 import Data.String (IsString)
-import Data.Text (Text)
 import Data.Time.Clock.System (SystemTime)
 import Data.Word
 import System.Posix.Types
+import Data.ByteString.Char8 (ByteString)
 
 -- | A system trace, which is simply a list of trace lines.
 type Trace = [Line]
@@ -30,7 +30,7 @@ mapEvent f (Line pid t ev) = Line pid t (f ev)
 -- | A system event.
 data Event
   = SystemCall SystemCall
-  | Signal SignalName Text
+  | Signal SignalName Struct
   | Killed SignalName
   | Exit Int
   deriving (Show)
@@ -43,7 +43,7 @@ mapSystemCall _ ev = ev
 --
 -- See <https://man7.org/linux/man-pages/man2/syscalls.2.html>.
 data SystemCall
-  = OtherSystemCall SystemCallName Text SystemCallStatus
+  = OtherSystemCall SystemCallName ByteString SystemCallStatus
   | Close Close
   | Connect Connect
   | Dup Dup
@@ -65,7 +65,7 @@ data SystemCall
 
 data Connect = MkConnect
   { sockfd :: FileDescriptor
-  , addr :: Pointer Text  -- TODO: indicate Struct
+  , addr :: Pointer Struct
   , addrlen :: CSocklen
   , ret :: Maybe Errno
   }
@@ -126,7 +126,7 @@ data Execve = MkExecve
 
 data Read_ = MkRead
   { fd :: FileDescriptor,
-    buf :: Pointer Str, -- TODO: ByteString?
+    buf :: Pointer Str,
     count :: ByteCount,
     ret :: Either Errno ByteCount
   }
@@ -134,7 +134,7 @@ data Read_ = MkRead
 
 data Write = MkWrite
   { fd :: FileDescriptor,
-    buf :: Pointer Str, -- TODO: ByteString?
+    buf :: Pointer Str,
     count :: ByteCount,
     ret :: Either Errno ByteCount
   }
@@ -142,14 +142,14 @@ data Write = MkWrite
 
 data Stat = MkStat
   { pathname :: Pointer Path,
-    statbuf :: Pointer Text,
+    statbuf :: Pointer Struct,
     ret :: Maybe Errno
   }
   deriving (Show)
 
 data Fstat = MkFstat
   { fd :: FileDescriptor,
-    statbuf :: Pointer Text,
+    statbuf :: Pointer Struct,
     ret :: Maybe Errno
   }
   deriving (Show)
@@ -157,7 +157,7 @@ data Fstat = MkFstat
 data Fstatat = MkFstatat
   { dirfd :: Dirfd,
     pathname :: Pointer Path,
-    statbuf :: Pointer Text,
+    statbuf :: Pointer Struct,
     flags :: Flags,
     ret :: Maybe Errno
   }
@@ -165,21 +165,21 @@ data Fstatat = MkFstatat
 
 data Lstat = MkLstat
   { pathname :: Pointer Path,
-    statbuf :: Pointer Text,
+    statbuf :: Pointer Struct,
     ret :: Maybe Errno
   }
   deriving (Show)
 
 data Statfs = MkStatfs
   { pathname :: Pointer Path,
-    buf :: Pointer Text,
+    buf :: Pointer Struct,
     ret :: Maybe Errno
   }
   deriving (Show)
 
 data Fstatfs = MkFstatfs
   { fd :: FileDescriptor,
-    buf :: Pointer Text,
+    buf :: Pointer Struct,
     ret :: Maybe Errno
   }
   deriving (Show)
@@ -190,16 +190,16 @@ data Pipe = MkPipe
   }
   deriving (Show)
 
--- | A possibly truncated string.
-data Str = Complete Text | Truncated Text
+-- | A possibly truncated ASCII string.
+data Str = Complete ByteString | Truncated ByteString
   deriving (Show)
 
 -- | The name of a system call.
-newtype SystemCallName = SystemCallName Text
+newtype SystemCallName = SystemCallName ByteString
   deriving (Eq, Ord, Show, IsString)
 
 -- | The name of a signal.
-newtype SignalName = SignalName Text
+newtype SignalName = SignalName ByteString
   deriving (Eq, Ord, Show, IsString)
 
 -- | Indicates whether a system call was interrupted.
@@ -207,11 +207,11 @@ data SystemCallStatus = Finished | Unfinished | Resumed
   deriving (Eq, Ord, Show)
 
 -- | See <https://man7.org/linux/man-pages/man3/errno.3.html>.
-newtype Errno = Errno Text
+newtype Errno = Errno ByteString
   deriving (Eq, Ord, Show, IsString)
 
 -- | A file system path.
-newtype Path = Path Text
+newtype Path = Path ByteString
   deriving (Show)
 
 -- | A file descriptor.
@@ -224,4 +224,7 @@ data Dirfd = AT_FDCWD | Dirfd FileDescriptor
   deriving (Show)
 
 -- | A set of symbolicated flag arguments.
-type Flags = Set Text
+type Flags = Set ByteString
+
+-- | A symbolicated string representation of struct data.
+type Struct = ByteString

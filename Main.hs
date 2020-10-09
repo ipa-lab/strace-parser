@@ -19,9 +19,8 @@ import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.List
 import Control.Monad
-import Data.Text (Text)
-import Data.Text qualified as Text
 import System.Clock
+import Data.ByteString.Char8 (ByteString)
 
 -- We assume the following strace invocation:
 --
@@ -71,7 +70,7 @@ main = do
       --let counts = countEvents t3
       --forM_ (sortOn snd $ Map.toList counts) $ \(n,c) -> printf "%20s\t%d\n" (Text.unpack n) c
 
-countEvents :: Trace -> Map Text Int
+countEvents :: Trace -> Map ByteString Int
 countEvents = go Map.empty
   where
     go m ((Line _ _ (SystemCall (OtherSystemCall (SystemCallName name) _ _))):ls) = 
