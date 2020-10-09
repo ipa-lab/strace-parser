@@ -67,14 +67,28 @@ parseErrno = Errno <$> takeWhile1 isAsciiUpper
 parseFlags :: Parser Flags
 parseFlags = Set.fromList <$> takeWhile1 (\s -> isAlphaNum s || s == '_') `sepBy` char '|'
 
--- TODO: returns just a string
--- TODO: can't handle nested structs
 struct :: Parser Text
 struct = do
   char '{'
-  str <- takeTill (== '}')
-  char '}'
-  return $ '{' `Text.cons` str `Text.snoc` '}'
+  str <- go
+  return $ '{' `Text.cons` str
+  where
+    go = do
+      str1 <- takeWhile (\c -> c /= '"' && c /= '{' && c /= '}')
+      c1 <- peekChar'
+      case c1 of
+        '"' -> do
+          str2 <- quotedString
+          str3 <- go
+          return $ str1 <> ('"' `Text.cons` str2 `Text.snoc` '"') <> str3
+        '{' -> do          
+          str2 <- struct
+          str3 <- go
+          return $ str1 <> str2 <> str3
+        '}' -> do
+          char '}'
+          return $ str1 `Text.snoc` '}'
+        _ -> fail "impossible"
 
 pid :: Parser ProcessID
 pid = decimal
