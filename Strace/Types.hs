@@ -45,6 +45,7 @@ mapSystemCall _ ev = ev
 data SystemCall
   = OtherSystemCall SystemCallName Text SystemCallStatus
   | Close Close
+  | Connect Connect
   | Dup Dup
   | Dup2 Dup2
   | Dup3 Dup3
@@ -52,12 +53,22 @@ data SystemCall
   | Fstat Fstat
   | Fstatat Fstatat
   | Lstat Lstat
-  | Openat Openat
+  | Openat Openat
   | Pipe Pipe
   | Read Read_
   | Rmdir Rmdir
   | Stat Stat
+  | Statfs Statfs
+  | Fstatfs Fstatfs
   | Write Write
+  deriving (Show)
+
+data Connect = MkConnect
+  { sockfd :: FileDescriptor
+  , addr :: Pointer Text  -- TODO: indicate Struct
+  , addrlen :: CSocklen
+  , ret :: Maybe Errno
+  }
   deriving (Show)
 
 data Dup = MkDup
@@ -155,6 +166,20 @@ data Fstatat = MkFstatat
 data Lstat = MkLstat
   { pathname :: Pointer Path,
     statbuf :: Pointer Text,
+    ret :: Maybe Errno
+  }
+  deriving (Show)
+
+data Statfs = MkStatfs
+  { pathname :: Pointer Path,
+    buf :: Pointer Text,
+    ret :: Maybe Errno
+  }
+  deriving (Show)
+
+data Fstatfs = MkFstatfs
+  { fd :: FileDescriptor,
+    buf :: Pointer Text,
     ret :: Maybe Errno
   }
   deriving (Show)

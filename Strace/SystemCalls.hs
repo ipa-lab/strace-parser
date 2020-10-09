@@ -20,18 +20,21 @@ parseEvents = map $ mapEvent $ mapSystemCall parseSystemCall
 parseSystemCall :: SystemCall -> SystemCall
 parseSystemCall c@(OtherSystemCall (SystemCallName name) args Finished) = case name of
   "close" -> parse $ Close <$> call1 MkClose fileDescriptor maybeErrno
+  "connect" -> parse $ Connect <$> call3 MkConnect fileDescriptor (pointerTo struct) decimal maybeErrno
   "dup" -> parse $ Dup <$> call1 MkDup fileDescriptor (eitherErrnoOr fileDescriptor)
   "dup2" -> parse $ Dup2 <$> call2 MkDup2 fileDescriptor fileDescriptor (eitherErrnoOr fileDescriptor)
   "dup3" -> parse $ Dup3 <$> call3 MkDup3 fileDescriptor fileDescriptor parseFlags (eitherErrnoOr fileDescriptor)
   "execve" -> parse $ Execve <$> call3 MkExecve (pointerTo path) (pointerTo (arrayOf str)) (pointerTo (arrayOf str)) maybeErrno
   "fstat" -> parse $ Fstat <$> call2 MkFstat fileDescriptor (pointerTo struct) maybeErrno
   "fstatat" -> parse $ Fstatat <$> call4 MkFstatat pDirfd (pointerTo path) (pointerTo struct) parseFlags maybeErrno
+  "fstatfs" -> parse $ Fstatfs <$> call2 MkFstatfs fileDescriptor (pointerTo struct) maybeErrno
   "lstat" -> parse $ Lstat <$> call2 MkLstat (pointerTo path) (pointerTo struct) maybeErrno
   "openat" -> parse $ Openat <$> call3'4 MkOpenat pDirfd (pointerTo path) parseFlags parseFlags (eitherErrnoOr fileDescriptor)
   "pipe" -> parse $ Pipe <$> call1 MkPipe (pointerTo (arrayOf fileDescriptor)) maybeErrno
   "read" -> parse $ Read <$> call3 MkRead fileDescriptor (pointerTo str) decimal (eitherErrnoOr decimal)
   "rmdir" -> parse $ Rmdir <$> call1 MkRmdir (pointerTo path) maybeErrno
   "stat" -> parse $ Stat <$> call2 MkStat (pointerTo path) (pointerTo struct) maybeErrno
+  "statfs" -> parse $ Statfs <$> call2 MkStatfs (pointerTo path) (pointerTo struct) maybeErrno
   "write" -> parse $ Write <$> call3 MkWrite fileDescriptor (pointerTo str) decimal (eitherErrnoOr decimal)
   _ -> c
   where
