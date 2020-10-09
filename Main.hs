@@ -3,6 +3,7 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Main where
 
@@ -20,6 +21,7 @@ import Data.List
 import Control.Monad
 import Data.Text (Text)
 import Data.Text qualified as Text
+import System.Clock
 
 -- We assume the following strace invocation:
 --
@@ -39,29 +41,35 @@ main = do
   hSetBuffering stdout NoBuffering
 
   printf "Parsing %s ... " file
-  r1 <- parseRawTrace file
+  !r1 <- parseRawTrace file
   case r1 of
     Left err -> printf "\n%s\n" err
     Right t1 -> do
       printf "%d lines\n" (length t1)
       
       printf "Unbreaking system calls ... "
-      let t2 = finishSystemCalls t1
+      let !t2 = finishSystemCalls t1
       printf "%d events\n" (length t2)
 
       printf "Parsing events ... "
-      let t3 = parseEvents t2
+      start <- getTime Monotonic
+      let !t3 = parseEvents t2
 
       let isUnknown (Line _ _ (SystemCall (OtherSystemCall _ _ _))) = True
           isUnknown _ = False
       let numUnknown = length $ filter isUnknown t3
       let numKnown = length t3 - numUnknown
 
-      printf "%d known / %d unknown\n" numKnown numUnknown
+      printf "%d known / %d unknown " numKnown numUnknown
 
-      let counts = countEvents t3
-      forM_ (sortOn snd $ Map.toList counts) $ \(n,c) -> printf "%20s\t%d\n" (Text.unpack n) c
+      end <- getTime Monotonic
+      let time :: Double = (fromIntegral $ toNanoSecs (diffTimeSpec start end)) / 1e9
+      printf "(%f s)\n" time
 
+--      pPrint $ take 100 t3
+
+      --let counts = countEvents t3
+      --forM_ (sortOn snd $ Map.toList counts) $ \(n,c) -> printf "%20s\t%d\n" (Text.unpack n) c
 
 countEvents :: Trace -> Map Text Int
 countEvents = go Map.empty
