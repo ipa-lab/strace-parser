@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | This module contains functions to parse "raw" @strace@ files.
-module Strace.Raw (parseRawTrace) where
+module Strace.Raw (parseRawTrace, trace, line) where
 
 import Control.Monad
 import Strace.Parser

@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Pass to parse system calls and signals and their arguments.
-module Strace.SystemCalls (parseEvents) where
+module Strace.SystemCalls (parseEvents, parseSystemCall) where
 
 import Control.Applicative
 import Data.Attoparsec.ByteString.Char8
