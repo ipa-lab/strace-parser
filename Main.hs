@@ -53,10 +53,18 @@ main = do
         & AS.parsed line
         & finishSystemCalls
         & S.map (mapEvent $ mapSystemCall parseSystemCall)
-        & (S.fold_ (\(i :: Int) _ -> i + 1) 0 id)
+--        & (S.fold_ (\(i :: Int) _ -> i + 1) 0 id)
+        & (S.fold_ countUnknownSysCalls mempty id)
 
-  print r
+  pPrint $ sortBy (compare `on` snd) $ Map.toList r
 
   end <- getTime Monotonic
   let time :: Double = (fromIntegral $ toNanoSecs (diffTimeSpec start end)) / 1e9
   printf "(%f s)\n" time
+
+
+
+countUnknownSysCalls :: Map SystemCallName Int -> Line -> Map SystemCallName Int
+countUnknownSysCalls m (Line _ _ (SystemCall (OtherSystemCall name _ _))) = 
+  Map.insertWith (+) name 1 m
+countUnknownSysCalls m _ = m

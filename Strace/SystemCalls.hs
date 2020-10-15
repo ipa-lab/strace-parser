@@ -31,6 +31,7 @@ parseSystemCall c@(OtherSystemCall (SystemCallName name) args Finished) = case n
   "pipe" -> parse $ Pipe <$> call1 MkPipe (pointerTo (arrayOf fileDescriptor)) maybeErrno
   "read" -> parse $ Read <$> call3 MkRead fileDescriptor (pointerTo str) decimal (eitherErrnoOr decimal)
   "rmdir" -> parse $ Rmdir <$> call1 MkRmdir (pointerTo path) maybeErrno
+  "rt_sigaction" -> parse $ Rtsigaction <$> call4 MkRtsigaction signalName (pointerTo struct) (pointerTo struct) decimal maybeErrno
   "stat" -> parse $ Stat <$> call2 MkStat (pointerTo path) (pointerTo struct) maybeErrno
   "statfs" -> parse $ Statfs <$> call2 MkStatfs (pointerTo path) (pointerTo struct) maybeErrno
   "write" -> parse $ Write <$> call3 MkWrite fileDescriptor (pointerTo str) decimal (eitherErrnoOr decimal)
@@ -38,7 +39,7 @@ parseSystemCall c@(OtherSystemCall (SystemCallName name) args Finished) = case n
   where
     --parse f = fromMaybe c $ parseMaybe f args
     parse f = case parseOnly f args of
-      Left err -> trace ("error parsing " ++ BS.unpack name ++ ": " ++ err) c
+      Left err -> trace ("error parsing " ++ BS.unpack name ++ ": " ++ err ++ "\n\t" ++ show args) c
       Right x -> x
 parseSystemCall x = x
 

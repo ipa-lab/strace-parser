@@ -11,6 +11,7 @@ import Data.Time.Clock.System (SystemTime)
 import Data.Word
 import System.Posix.Types
 import Data.ByteString.Char8 (ByteString)
+import Foreign.C.Types
 
 -- | A system trace, which is simply a list of trace lines.
 type Trace = [Line]
@@ -57,6 +58,7 @@ data SystemCall
   | Pipe Pipe
   | Read Read_
   | Rmdir Rmdir
+  | Rtsigaction Rtsigaction
   | Stat Stat
   | Statfs Statfs
   | Fstatfs Fstatfs
@@ -134,6 +136,15 @@ data Write = MkWrite
     buf :: Pointer Str,
     count :: ByteCount,
     ret :: Either Errno ByteCount
+  }
+  deriving (Show)
+
+data Rtsigaction = MkRtsigaction
+  { signum :: SignalName
+  , act :: Pointer Struct
+  , oldact :: Pointer Struct
+  , sigsetsize :: CSize
+  , ret :: Maybe Errno
   }
   deriving (Show)
 
