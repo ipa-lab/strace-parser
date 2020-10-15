@@ -107,9 +107,6 @@ data Openat = MkOpenat
   }
   deriving (Show)
 
-data Pointer a = Pointer Word64 | Deref a
-  deriving (Show)
-
 data Close = MkClose
   { fd :: FileDescriptor,
     ret :: Maybe Errno
@@ -188,6 +185,10 @@ data Pipe = MkPipe
   { pipefd :: Pointer [FileDescriptor],
     ret :: Maybe Errno
   }
+  deriving (Show)
+
+-- | A pointer to a potentially dereferenced/symbolicated value.
+data Pointer a = Pointer Word64 | Deref a
   deriving (Show)
 
 -- | A possibly truncated ASCII string.

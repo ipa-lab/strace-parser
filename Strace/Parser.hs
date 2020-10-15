@@ -63,7 +63,12 @@ arrayOf :: Parser a -> Parser [a]
 arrayOf p = char '[' *> p `sepBy` ", " <* char ']'
 
 pointerTo :: Parser a -> Parser (Pointer a)
-pointerTo p = (Pointer <$> ("0x" *> hexadecimal)) <|> (Deref <$> p)
+pointerTo p =
+  choice
+    [ Pointer <$> ("0x" *> hexadecimal),
+      Pointer <$> ("NULL" *> pure 0),
+      Deref <$> p
+    ]
 
 parseErrno :: Parser Errno
 parseErrno = Errno <$> takeWhile1 isAsciiUpper
@@ -108,7 +113,7 @@ systemCallName :: Parser SystemCallName
 systemCallName = SystemCallName <$> takeWhile1 (\s -> isAlphaNum s || s == '_')
 
 signalName :: Parser SignalName
-signalName = SignalName <$> takeWhile1 isAsciiUpper
+signalName = SignalName <$> takeWhile1 (\s -> isAlphaNum s || s == '_')
 
 skipHorizontalSpace :: Parser ()
 skipHorizontalSpace = skipWhile (\c -> c == ' ' || c == '\t')
