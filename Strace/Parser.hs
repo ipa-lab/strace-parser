@@ -43,7 +43,13 @@ pDirfd :: Parser Dirfd
 pDirfd = ("AT_FDCWD" *> return AT_FDCWD) <|> Dirfd <$> fileDescriptor
 
 quotedString :: Parser ByteString
-quotedString = char '"' *> (BS.concat . L.toChunks . toLazyByteString <$> go mempty) <* char '"'
+quotedString = toBS <$> quotedStringBuilder
+
+toBS :: Builder -> ByteString
+toBS = BS.concat . L.toChunks . toLazyByteString
+
+quotedStringBuilder :: Parser Builder
+quotedStringBuilder = char '"' *> go mempty <* char '"'
   where
     go t0 = do
       t1 <- takeWhile (/= '"')
@@ -77,26 +83,22 @@ parseFlags :: Parser Flags
 parseFlags = Set.fromList <$> takeWhile1 (\s -> isAlphaNum s || s == '_') `sepBy` char '|'
 
 struct :: Parser ByteString
-struct = do
-  char '{'
-  str <- go
-  return $ '{' `BS.cons` str
+struct = toBS <$> structBuilder
+
+structBuilder :: Parser Builder
+structBuilder = char '{' *> go (char8 '{') <* char '}'
   where
-    go = do
-      str1 <- takeWhile (\c -> c /= '"' && c /= '{' && c /= '}')
+    go t0 = do
+      t1 <- byteString <$> takeWhile (\c -> c /= '"' && c /= '{' && c /= '}')
       c1 <- peekChar'
       case c1 of
         '"' -> do
-          str2 <- quotedString
-          str3 <- go
-          return $ str1 <> (('"' `BS.cons` str2) `BS.snoc` '"') <> str3
+          t2 <- quotedStringBuilder
+          go (t0 <> t1 <> char8 '"' <> t2 <> char8 '"')
         '{' -> do
-          str2 <- struct
-          str3 <- go
-          return $ str1 <> str2 <> str3
-        '}' -> do
-          char '}'
-          return $ str1 `BS.snoc` '}'
+          t2 <- structBuilder
+          go (t0 <> t1 <> t2)
+        '}' -> return (t0 <> t1 <> char8 '}')
         _ -> fail "impossible"
 
 pid :: Parser ProcessID
