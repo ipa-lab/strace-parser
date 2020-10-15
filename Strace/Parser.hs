@@ -9,9 +9,11 @@ module Strace.Parser where
 
 import Control.Applicative
 import Control.Monad
-import Data.Attoparsec.ByteString.Char8
+import Data.Attoparsec.ByteString.Char8 hiding (char8)
+import Data.ByteString.Builder
 import Data.ByteString.Char8 (ByteString)
 import Data.ByteString.Char8 qualified as BS
+import Data.ByteString.Lazy.Char8 qualified as L
 import Data.Char
 import Data.Maybe
 import Data.Set qualified as Set
@@ -41,19 +43,21 @@ pDirfd :: Parser Dirfd
 pDirfd = ("AT_FDCWD" *> return AT_FDCWD) <|> Dirfd <$> fileDescriptor
 
 quotedString :: Parser ByteString
-quotedString = do
-  char '"'
-  go
+quotedString = char '"' *> (BS.concat . L.toChunks . toLazyByteString <$> go mempty) <* char '"'
   where
-    go = do
-      str <- takeWhile (\c -> c /= '\\' && c /= '"')
-      c1 <- anyChar
-      if c1 == '"'
-        then return str
-        else do
-          c2 <- anyChar
-          let str' = if c2 == '"' then str `BS.snoc` c2 else str `BS.snoc` c1 `BS.snoc` c2
-          liftA2 BS.append (return str') go
+    go t0 = do
+      t1 <- takeWhile (/= '"')
+      if endsWithOddNumberOfSlashes t1
+        then char '"' *> go (t0 <> byteString t1 <> char8 '"')
+        else return (t0 <> byteString t1)
+
+endsWithOddNumberOfSlashes :: ByteString -> Bool
+endsWithOddNumberOfSlashes t = go False (BS.length t - 1)
+  where
+    go !b !n
+      | n < 0 = b
+      | BS.index t n == '\\' = go (not b) (n -1)
+      | otherwise = b
 
 arrayOf :: Parser a -> Parser [a]
 arrayOf p = char '[' *> p `sepBy` ", " <* char ']'
