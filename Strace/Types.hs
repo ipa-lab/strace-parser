@@ -46,7 +46,7 @@ mapSystemCall _ ev = ev
 --
 -- See <https://man7.org/linux/man-pages/man2/syscalls.2.html>.
 data SystemCall
-  = OtherSystemCall SystemCallName ByteString SystemCallStatus
+  = Unknown SystemCallName ByteString SystemCallStatus
   | Close Close
   | Connect Connect
   | Dup Dup

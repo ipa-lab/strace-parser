@@ -20,18 +20,18 @@ finishSystemCalls = metamorph produce consume (Pair mempty [])
 
 consume :: Pair SysCallMap [Line] -> Line -> Pair SysCallMap [Line]
 consume (Pair m ls) l = case l of
-  Line pid _ (SystemCall (OtherSystemCall _ _ Unfinished)) ->
+  Line pid _ (SystemCall (Unknown _ _ Unfinished)) ->
     let m' = IntMap.insert (fromEnum pid) l m in Pair m' []
   _ -> Pair m (l : ls)
 
 produce :: Pair SysCallMap [Line] -> Maybe (Line, Pair SysCallMap [Line])
 produce (Pair _ []) = Nothing
 produce (Pair m (l : ls)) = case l of
-  Line pid t2 (SystemCall (OtherSystemCall name2 args2 Resumed))
+  Line pid t2 (SystemCall (Unknown name2 args2 Resumed))
     | Just (Line _ _ (SystemCall c1)) <- IntMap.lookup (fromEnum pid) m,
-      OtherSystemCall name1 args1 Unfinished <- c1,
+      Unknown name1 args1 Unfinished <- c1,
       name1 == name2 ->
-      let c' = OtherSystemCall name1 (args1 <> args2) Finished
+      let c' = Unknown name1 (args1 <> args2) Finished
           l' = Line pid t2 (SystemCall c') -- TODO: merge t1 and t2 ?
           m' = IntMap.delete (fromEnum pid) m
        in Just (l', Pair m' ls)

@@ -34,12 +34,13 @@ import GHC.Generics
 import Strace.Parser
 import Strace.Types
 import System.Posix.Types
+import Data.Coerce
 
 parseEvents :: Trace -> Trace
 parseEvents = map $ mapEvent $ mapSystemCall parseSystemCall
 
 parseSystemCall :: SystemCall -> SystemCall
-parseSystemCall c@(OtherSystemCall (SystemCallName name) args Finished) = case name of
+parseSystemCall c@(Unknown name args Finished) = case name of
   "close" -> parse $ Close <$> parser
   "connect" -> parse $ Connect <$> parser
   "dup" -> parse $ Dup <$> parser
@@ -62,7 +63,7 @@ parseSystemCall c@(OtherSystemCall (SystemCallName name) args Finished) = case n
   where
     --parse f = fromMaybe c $ parseMaybe f args
     parse f = case parseOnly f args of
-      Left err -> trace ("error parsing " ++ BS.unpack name ++ ": " ++ err ++ "\n\t" ++ show args) c
+      Left err -> trace ("error parsing " ++ coerce BS.unpack name ++ ": " ++ err ++ "\n\t" ++ show args) c
       Right x -> x
 parseSystemCall x = x
 

@@ -66,6 +66,6 @@ main = do
 
 
 countUnknownSysCalls :: Map SystemCallName Int -> Line -> Map SystemCallName Int
-countUnknownSysCalls m (Line _ _ (SystemCall (OtherSystemCall name _ _))) = 
+countUnknownSysCalls m (Line _ _ (SystemCall (Unknown name _ _))) = 
   Map.insertWith (+) name 1 m
 countUnknownSysCalls m _ = m

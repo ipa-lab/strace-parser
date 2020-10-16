@@ -48,7 +48,7 @@ systemCallResumed = do
   name <- systemCallName
   " resumed>"
   line <- takeWhile (/= '\n')
-  return $ SystemCall $ OtherSystemCall name line Resumed
+  return $ SystemCall $ Unknown name line Resumed
 
 systemCall :: Parser Event
 systemCall = do
@@ -56,6 +56,6 @@ systemCall = do
   skipHorizontalSpace
   line <- takeWhile (/= '\n')
   let syscall = case BS.stripSuffix " <unfinished ...>" line of
-        Nothing -> OtherSystemCall name line Finished
-        Just line' -> OtherSystemCall name line' Unfinished
+        Nothing -> Unknown name line Finished
+        Just line' -> Unknown name line' Unfinished
   return $ SystemCall syscall
