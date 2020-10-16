@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -12,6 +13,7 @@ import Data.Word
 import System.Posix.Types
 import Data.ByteString.Char8 (ByteString)
 import Foreign.C.Types
+import GHC.Generics
 
 -- | A system trace, which is simply a list of trace lines.
 type Trace = [Line]
@@ -71,20 +73,20 @@ data Connect = MkConnect
   , addrlen :: CSocklen
   , ret :: Maybe Errno
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Dup = MkDup
   { oldfd :: FileDescriptor,
     ret :: Either Errno FileDescriptor
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Dup2 = MkDup2
   { oldfd :: FileDescriptor,
     newfd :: FileDescriptor,
     ret :: Either Errno FileDescriptor
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Dup3 = MkDup3
   { oldfd :: FileDescriptor,
@@ -92,13 +94,13 @@ data Dup3 = MkDup3
     flags :: Flags,
     ret :: Either Errno FileDescriptor
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Rmdir = MkRmdir
   { pathname :: Pointer Path,
     ret :: Maybe Errno
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Openat = MkOpenat
   { dirfd :: Dirfd,
@@ -107,13 +109,13 @@ data Openat = MkOpenat
     mode :: Maybe Flags,
     ret :: Either Errno FileDescriptor
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Close = MkClose
   { fd :: FileDescriptor,
     ret :: Maybe Errno
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Execve = MkExecve
   { pathname :: Pointer Path,
@@ -121,7 +123,7 @@ data Execve = MkExecve
     envp :: Pointer [Str],
     ret :: Maybe Errno
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Read_ = MkRead
   { fd :: FileDescriptor,
@@ -129,7 +131,7 @@ data Read_ = MkRead
     count :: ByteCount,
     ret :: Either Errno ByteCount
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Write = MkWrite
   { fd :: FileDescriptor,
@@ -137,7 +139,7 @@ data Write = MkWrite
     count :: ByteCount,
     ret :: Either Errno ByteCount
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Rtsigaction = MkRtsigaction
   { signum :: SignalName
@@ -146,21 +148,21 @@ data Rtsigaction = MkRtsigaction
   , sigsetsize :: CSize
   , ret :: Maybe Errno
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Stat = MkStat
   { pathname :: Pointer Path,
     statbuf :: Pointer Struct,
     ret :: Maybe Errno
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Fstat = MkFstat
   { fd :: FileDescriptor,
     statbuf :: Pointer Struct,
     ret :: Maybe Errno
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Fstatat = MkFstatat
   { dirfd :: Dirfd,
@@ -169,34 +171,34 @@ data Fstatat = MkFstatat
     flags :: Flags,
     ret :: Maybe Errno
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Lstat = MkLstat
   { pathname :: Pointer Path,
     statbuf :: Pointer Struct,
     ret :: Maybe Errno
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Statfs = MkStatfs
   { pathname :: Pointer Path,
     buf :: Pointer Struct,
     ret :: Maybe Errno
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Fstatfs = MkFstatfs
   { fd :: FileDescriptor,
     buf :: Pointer Struct,
     ret :: Maybe Errno
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data Pipe = MkPipe
   { pipefd :: Pointer [FileDescriptor],
     ret :: Maybe Errno
   }
-  deriving (Show)
+  deriving (Show, Generic)
 
 -- | A pointer to a potentially dereferenced/symbolicated value.
 data Pointer a = Pointer Word64 | Deref a
@@ -236,7 +238,9 @@ data Dirfd = AT_FDCWD | Dirfd FileDescriptor
   deriving (Show)
 
 -- | A set of symbolicated flag arguments.
-type Flags = Set ByteString
+newtype Flags = Flags (Set ByteString)
+  deriving (Show)
 
 -- | A symbolicated string representation of struct data.
-type Struct = ByteString
+newtype Struct = Struct ByteString
+  deriving (Show)

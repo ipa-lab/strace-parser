@@ -38,7 +38,8 @@ signal = do
   "--- "
   name <- signalName
   skipHorizontalSpace
-  info <- BS.pack <$> manyTill anyChar " ---"
+  -- TODO: no guarantee this is a struct here...
+  info <- Struct <$> BS.pack <$> manyTill anyChar " ---"
   return $ Signal name info
 
 systemCallResumed :: Parser Event

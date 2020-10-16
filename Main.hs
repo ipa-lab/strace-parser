@@ -53,10 +53,11 @@ main = do
         & AS.parsed line
         & finishSystemCalls
         & S.map (mapEvent $ mapSystemCall parseSystemCall)
---        & (S.fold_ (\(i :: Int) _ -> i + 1) 0 id)
-        & (S.fold_ countUnknownSysCalls mempty id)
+        & (S.fold_ (\(i :: Int) _ -> i + 1) 0 id)
+--        & (S.fold_ countUnknownSysCalls mempty id)
 
-  pPrint $ sortBy (compare `on` snd) $ Map.toList r
+  print r
+--  pPrint $ sortBy (compare `on` snd) $ Map.toList r
 
   end <- getTime Monotonic
   let time :: Double = (fromIntegral $ toNanoSecs (diffTimeSpec start end)) / 1e9

@@ -80,10 +80,10 @@ parseErrno :: Parser Errno
 parseErrno = Errno <$> takeWhile1 isAsciiUpper
 
 parseFlags :: Parser Flags
-parseFlags = Set.fromList <$> takeWhile1 (\s -> isAlphaNum s || s == '_') `sepBy` char '|'
+parseFlags = Flags <$> Set.fromList <$> takeWhile1 (\s -> isAlphaNum s || s == '_') `sepBy` char '|'
 
-struct :: Parser ByteString
-struct = toBS <$> structBuilder
+struct :: Parser Struct
+struct = Struct <$> toBS <$> structBuilder
 
 structBuilder :: Parser Builder
 structBuilder = char '{' *> go (char8 '{') <* char '}'

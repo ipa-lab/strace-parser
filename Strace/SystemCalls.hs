@@ -1,6 +1,23 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Pass to parse system calls and signals and their arguments.
 module Strace.SystemCalls (parseEvents, parseSystemCall) where
@@ -8,33 +25,39 @@ module Strace.SystemCalls (parseEvents, parseSystemCall) where
 import Control.Applicative
 import Data.Attoparsec.ByteString.Char8
 import Data.ByteString.Char8 qualified as BS
+import Data.Int
+import Data.Proxy
+import Data.Word
 import Debug.Trace
+import Foreign.C.Types
+import GHC.Generics
 import Strace.Parser
 import Strace.Types
+import System.Posix.Types
 
 parseEvents :: Trace -> Trace
 parseEvents = map $ mapEvent $ mapSystemCall parseSystemCall
 
 parseSystemCall :: SystemCall -> SystemCall
 parseSystemCall c@(OtherSystemCall (SystemCallName name) args Finished) = case name of
-  "close" -> parse $ Close <$> call1 MkClose fileDescriptor maybeErrno
-  "connect" -> parse $ Connect <$> call3 MkConnect fileDescriptor (pointerTo struct) decimal maybeErrno
-  "dup" -> parse $ Dup <$> call1 MkDup fileDescriptor (eitherErrnoOr fileDescriptor)
-  "dup2" -> parse $ Dup2 <$> call2 MkDup2 fileDescriptor fileDescriptor (eitherErrnoOr fileDescriptor)
-  "dup3" -> parse $ Dup3 <$> call3 MkDup3 fileDescriptor fileDescriptor parseFlags (eitherErrnoOr fileDescriptor)
-  "execve" -> parse $ Execve <$> call3 MkExecve (pointerTo path) (pointerTo (arrayOf str)) (pointerTo (arrayOf str)) maybeErrno
-  "fstat" -> parse $ Fstat <$> call2 MkFstat fileDescriptor (pointerTo struct) maybeErrno
-  "fstatat" -> parse $ Fstatat <$> call4 MkFstatat pDirfd (pointerTo path) (pointerTo struct) parseFlags maybeErrno
-  "fstatfs" -> parse $ Fstatfs <$> call2 MkFstatfs fileDescriptor (pointerTo struct) maybeErrno
-  "lstat" -> parse $ Lstat <$> call2 MkLstat (pointerTo path) (pointerTo struct) maybeErrno
-  "openat" -> parse $ Openat <$> call3'4 MkOpenat pDirfd (pointerTo path) parseFlags parseFlags (eitherErrnoOr fileDescriptor)
-  "pipe" -> parse $ Pipe <$> call1 MkPipe (pointerTo (arrayOf fileDescriptor)) maybeErrno
-  "read" -> parse $ Read <$> call3 MkRead fileDescriptor (pointerTo str) decimal (eitherErrnoOr decimal)
-  "rmdir" -> parse $ Rmdir <$> call1 MkRmdir (pointerTo path) maybeErrno
-  "rt_sigaction" -> parse $ Rtsigaction <$> call4 MkRtsigaction signalName (pointerTo struct) (pointerTo struct) decimal maybeErrno
-  "stat" -> parse $ Stat <$> call2 MkStat (pointerTo path) (pointerTo struct) maybeErrno
-  "statfs" -> parse $ Statfs <$> call2 MkStatfs (pointerTo path) (pointerTo struct) maybeErrno
-  "write" -> parse $ Write <$> call3 MkWrite fileDescriptor (pointerTo str) decimal (eitherErrnoOr decimal)
+  "close" -> parse $ Close <$> parser
+  "connect" -> parse $ Connect <$> parser
+  "dup" -> parse $ Dup <$> parser
+  "dup2" -> parse $ Dup2 <$> parser
+  "dup3" -> parse $ Dup3 <$> parser
+  "execve" -> parse $ Execve <$> parser
+  "fstat" -> parse $ Fstat <$> parser
+  "fstatat" -> parse $ Fstatat <$> parser
+  "fstatfs" -> parse $ Fstatfs <$> parser
+  "lstat" -> parse $ Lstat <$> parser
+  "openat" -> parse $ Openat <$> parser
+  "pipe" -> parse $ Pipe <$> parser
+  "read" -> parse $ Read <$> parser
+  "rmdir" -> parse $ Rmdir <$> parser
+  "rt_sigaction" -> parse $ Rtsigaction <$> parser
+  "stat" -> parse $ Stat <$> parser
+  "statfs" -> parse $ Statfs <$> parser
+  "write" -> parse $ Write <$> parser
   _ -> c
   where
     --parse f = fromMaybe c $ parseMaybe f args
@@ -50,84 +73,134 @@ eitherErrnoOr p =
 maybeErrno :: Parser (Maybe Errno)
 maybeErrno = either Just (const Nothing) <$> eitherErrnoOr "0"
 
-call1 ::
-  (a1 -> r -> b) ->
-  Parser a1 ->
-  Parser r ->
-  Parser b
-call1 f p1 pr = do
-  a1 <- "(" *> p1
-  r <- ")" *> skipHorizontalSpace *> "=" *> skipHorizontalSpace *> pr
-  return $ f a1 r
+arg0 :: Parser a -> Parser a
+arg0 p = "(" *> p
 
-call2 ::
-  (a1 -> a2 -> r -> b) ->
-  Parser a1 ->
-  Parser a2 ->
-  Parser r ->
-  Parser b
-call2 f p1 p2 pr = do
-  a1 <- "(" *> p1
-  a2 <- ", " *> p2
-  r <- ")" *> skipHorizontalSpace *> "=" *> skipHorizontalSpace *> pr
-  return $ f a1 a2 r
+arg :: Parser a -> Parser a
+arg p = ", " *> p
 
-call2'3 ::
-  (a1 -> a2 -> Maybe a3 -> r -> b) ->
-  Parser a1 ->
-  Parser a2 ->
-  Parser a3 ->
-  Parser r ->
-  Parser b
-call2'3 f p1 p2 p3 pr = do
-  a1 <- "(" *> p1
-  a2 <- ", " *> p2
-  a3 <- optional $ ", " *> p3
-  r <- ")" *> skipHorizontalSpace *> "=" *> skipHorizontalSpace *> pr
-  return $ f a1 a2 a3 r
+retp :: Parser a -> Parser a
+retp p = ")" *> skipHorizontalSpace *> "=" *> skipHorizontalSpace *> p
 
-call3 ::
-  (a1 -> a2 -> a3 -> r -> b) ->
-  Parser a1 ->
-  Parser a2 ->
-  Parser a3 ->
-  Parser r ->
-  Parser b
-call3 f p1 p2 p3 pr = do
-  a1 <- "(" *> p1
-  a2 <- ", " *> p2
-  a3 <- ", " *> p3
-  r <- ")" *> skipHorizontalSpace *> "=" *> skipHorizontalSpace *> pr
-  return $ f a1 a2 a3 r
+data Pos = S | L | M | R
 
-call3'4 ::
-  (a1 -> a2 -> a3 -> (Maybe a4) -> r -> b) ->
-  Parser a1 ->
-  Parser a2 ->
-  Parser a3 ->
-  Parser a4 ->
-  Parser r ->
-  Parser b
-call3'4 f p1 p2 p3 p4 pr = do
-  a1 <- "(" *> p1
-  a2 <- ", " *> p2
-  a3 <- ", " *> p3
-  a4 <- optional $ ", " *> p4
-  r <- ")" *> skipHorizontalSpace *> "=" *> skipHorizontalSpace *> pr
-  return $ f a1 a2 a3 a4 r
+type family MoveL (p :: Pos) :: Pos where
+  MoveL 'S = 'L
+  MoveL 'L = 'L
+  MoveL _ = 'M
 
-call4 ::
-  (a1 -> a2 -> a3 -> a4 -> r -> b) ->
-  Parser a1 ->
-  Parser a2 ->
-  Parser a3 ->
-  Parser a4 ->
-  Parser r ->
-  Parser b
-call4 f p1 p2 p3 p4 pr = do
-  a1 <- "(" *> p1
-  a2 <- ", " *> p2
-  a3 <- ", " *> p3
-  a4 <- ", " *> p4
-  r <- ")" *> skipHorizontalSpace *> "=" *> skipHorizontalSpace *> pr
-  return $ f a1 a2 a3 a4 r
+type family MoveR (p :: Pos) :: Pos where
+  MoveR 'S = 'R
+  MoveR 'R = 'R
+  MoveR _ = 'M
+
+class Parsable a where
+  parser :: Parser a
+  default parser :: (Generic a, GParsable 'S a (Rep a)) => Parser a
+  parser = fmap to (gparser @'S @a)
+  {-# INLINE parser #-}
+
+class GParsable (p :: Pos) r f where
+  gparser :: Parser (f r)
+
+instance (GParsable (MoveL p) r a, GParsable (MoveR p) r b) => GParsable p r (a :*: b) where
+  gparser = (:*:) <$> gparser @(MoveL p) <*> gparser @(MoveR p)
+
+instance GParsable p r a => GParsable p r (M1 i c a) where
+  gparser = M1 <$> gparser @p
+
+-- no arguments
+instance Parsable a => GParsable 'S r (K1 i a) where
+  gparser = K1 <$> (arg0 (pure ()) *> retp parser)
+
+-- the first argument
+instance Parsable a => GParsable 'L r (K1 i a) where
+  gparser = K1 <$> (arg0 parser)
+
+-- some argument
+instance Parsable a => GParsable 'M r (K1 i a) where
+  gparser = K1 <$> (arg parser)
+
+-- an optional argument
+instance {-# OVERLAPPING #-} Parsable a => GParsable 'M r (K1 i (Maybe a)) where
+  gparser = K1 <$> (optional $ arg parser)
+
+-- the return value
+instance Parsable a => GParsable 'R r (K1 i (Either Errno a)) where
+  gparser = K1 <$> (retp $ eitherErrnoOr parser)
+
+-- the return value (0 or errno)
+instance GParsable 'R r (K1 i (Maybe Errno)) where
+  gparser = K1 <$> (retp maybeErrno)
+
+deriving instance Parsable Close
+
+deriving instance Parsable Connect
+
+deriving instance Parsable Dup
+
+deriving instance Parsable Dup2
+
+deriving instance Parsable Dup3
+
+deriving instance Parsable Execve
+
+deriving instance Parsable Fstat
+
+deriving instance Parsable Fstatat
+
+deriving instance Parsable Lstat
+
+deriving instance Parsable Openat
+
+deriving instance Parsable Pipe
+
+deriving instance Parsable Read_
+
+deriving instance Parsable Rmdir
+
+deriving instance Parsable Rtsigaction
+
+deriving instance Parsable Stat
+
+deriving instance Parsable Statfs
+
+deriving instance Parsable Fstatfs
+
+deriving instance Parsable Write
+
+instance Parsable FileDescriptor where
+  parser = fileDescriptor
+
+instance Parsable a => Parsable (Pointer a) where
+  parser = pointerTo parser
+
+instance Parsable a => Parsable [a] where
+  parser = arrayOf parser
+
+instance Parsable Errno where
+  parser = parseErrno
+
+instance Parsable Struct where
+  parser = struct
+
+instance Parsable Path where
+  parser = path
+
+instance Parsable CSocklen where
+  parser = decimal
+
+instance Parsable CSize where
+  parser = decimal
+
+instance Parsable Flags where
+  parser = parseFlags
+
+instance Parsable Str where
+  parser = str
+
+instance Parsable Dirfd where
+  parser = pDirfd
+
+instance Parsable SignalName where
+  parser = signalName
