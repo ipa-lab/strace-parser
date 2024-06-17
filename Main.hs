@@ -11,7 +11,6 @@ import Control.Monad
 import Control.Monad.Trans.Resource
 import Data.Attoparsec.ByteString.Streaming qualified as AS
 import Data.ByteString.Char8 (ByteString)
-import Data.ByteString.Streaming.Char8 qualified as Q
 import Data.Function
 import Data.List
 import Data.Map (Map)
@@ -21,6 +20,7 @@ import Strace.Raw
 import Strace.SystemCalls
 import Strace.Types
 import Streaming
+import Streaming.ByteString.Char8 qualified as Q
 import Streaming.Prelude qualified as S
 import System.Clock
 import System.Environment
@@ -43,26 +43,21 @@ main :: IO ()
 main = do
   [file] <- getArgs
 
-  hSetBuffering stdout NoBuffering
-
   start <- getTime Monotonic
-
-  r <-
-    runResourceT $
-      Q.readFile file
-        & AS.parsed line
-        & finishSystemCalls
-        & S.map (mapEvent $ mapSystemCall parseSystemCall)
-        & (S.fold_ (\(i :: Int) _ -> i + 1) 0 id)
---        & (S.fold_ countUnknownSysCalls mempty id)
+  !r <- runResourceT 
+      $ Q.readFile file
+      & AS.parsed line
+      & finishSystemCalls
+   -- & S.map (mapEvent $ mapSystemCall parseSystemCall)
+      & S.length_
+   -- & (S.fold_ countUnknownSysCalls mempty id)
+  end <- getTime Monotonic
 
   print r
---  pPrint $ sortBy (compare `on` snd) $ Map.toList r
-
-  end <- getTime Monotonic
+  --  pPrint $ sortBy (compare `on` snd) $ Map.toList r
+  
   let time :: Double = (fromIntegral $ toNanoSecs (diffTimeSpec start end)) / 1e9
   printf "(%f s)\n" time
-
 
 
 countUnknownSysCalls :: Map SystemCallName Int -> Line -> Map SystemCallName Int

@@ -41,25 +41,25 @@ parseEvents = map $ mapEvent $ mapSystemCall parseSystemCall
 
 parseSystemCall :: SystemCall -> SystemCall
 parseSystemCall c@(Unknown name args Finished) = case name of
-  "close" -> parse $ Close <$> parser
+  "close"   -> parse $ Close <$> parser
   "connect" -> parse $ Connect <$> parser
-  "dup" -> parse $ Dup <$> parser
-  "dup2" -> parse $ Dup2 <$> parser
-  "dup3" -> parse $ Dup3 <$> parser
-  "execve" -> parse $ Execve <$> parser
-  "fstat" -> parse $ Fstat <$> parser
+  "dup"     -> parse $ Dup <$> parser
+  "dup2"    -> parse $ Dup2 <$> parser
+  "dup3"    -> parse $ Dup3 <$> parser
+  "execve"  -> parse $ Execve <$> parser
+  "fstat"   -> parse $ Fstat <$> parser
   "fstatat" -> parse $ Fstatat <$> parser
   "fstatfs" -> parse $ Fstatfs <$> parser
-  "lstat" -> parse $ Lstat <$> parser
-  "openat" -> parse $ Openat <$> parser
-  "pipe" -> parse $ Pipe <$> parser
-  "read" -> parse $ Read <$> parser
-  "rmdir" -> parse $ Rmdir <$> parser
+  "lstat"   -> parse $ Lstat <$> parser
+  "openat"  -> parse $ Openat <$> parser
+  "pipe"    -> parse $ Pipe <$> parser
+  "read"    -> parse $ Read <$> parser
+  "rmdir"   -> parse $ Rmdir <$> parser
   "rt_sigaction" -> parse $ Rtsigaction <$> parser
-  "stat" -> parse $ Stat <$> parser
-  "statfs" -> parse $ Statfs <$> parser
-  "write" -> parse $ Write <$> parser
-  _ -> c
+  "stat"    -> parse $ Stat <$> parser
+  "statfs"  -> parse $ Statfs <$> parser
+  "write"   -> parse $ Write <$> parser
+  _         -> c
   where
     --parse f = fromMaybe c $ parseMaybe f args
     parse f = case parseOnly f args of

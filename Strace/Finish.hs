@@ -2,42 +2,46 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
 
--- | Pass to stitch together unfinished system calls.
 module Strace.Finish (finishSystemCalls) where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
+import Prelude hiding (lookup)
 import Strace.Types
 import Streaming
 import Streaming.Internal
 
-data Pair a b = Pair !a !b
+type SysCallMap = IntMap SystemCall
 
-type SysCallMap = IntMap Line
+insert pid = IntMap.insert (fromEnum pid)
+lookup pid = IntMap.lookup (fromEnum pid)
+delete pid = IntMap.delete (fromEnum pid)
 
 finishSystemCalls :: Monad m => Stream (Of Line) m r -> Stream (Of Line) m r
-finishSystemCalls = metamorph produce consume (Pair mempty [])
+finishSystemCalls = metamorph produce consume (mempty, Nothing)
+ where
+  consume (!m, _) l@(Line pid _ e) = case e of
+    SystemCall c@(Unknown _ _ Unfinished) -> (insert pid c m, Nothing)
+    _                                     -> (             m, Just l )
 
-consume :: Pair SysCallMap [Line] -> Line -> Pair SysCallMap [Line]
-consume (Pair m ls) l = case l of
-  Line pid _ (SystemCall (Unknown _ _ Unfinished)) ->
-    let m' = IntMap.insert (fromEnum pid) l m in Pair m' []
-  _ -> Pair m (l : ls)
+  produce (!m, k) = case k of
+    Just (Line pid t2 e)
+      | SystemCall (Unknown _              args2  Resumed   ) <- e
+      , Just       (Unknown name  args1           Unfinished) <- lookup pid m
+      , let c' =   (Unknown name (args1 <> args2) Finished  )
+      , let l' = Line pid t2 (SystemCall c')
+            -> Just (l', (delete pid m, Nothing))
+    Just l  -> Just (l , (           m, Nothing))
+    Nothing -> Nothing
 
-produce :: Pair SysCallMap [Line] -> Maybe (Line, Pair SysCallMap [Line])
-produce (Pair _ []) = Nothing
-produce (Pair m (l : ls)) = case l of
-  Line pid t2 (SystemCall (Unknown name2 args2 Resumed))
-    | Just (Line _ _ (SystemCall c1)) <- IntMap.lookup (fromEnum pid) m,
-      Unknown name1 args1 Unfinished <- c1,
-      name1 == name2 ->
-      let c' = Unknown name1 (args1 <> args2) Finished
-          l' = Line pid t2 (SystemCall c') -- TODO: merge t1 and t2 ?
-          m' = IntMap.delete (fromEnum pid) m
-       in Just (l', Pair m' ls)
-  _ -> Just (l, Pair m ls)
+------------------------------------------------------------------------------
 
-metamorph :: Monad m => (s -> Maybe (b, s)) -> (s -> a -> s) -> s -> Stream (Of a) m r -> Stream (Of b) m r
+metamorph :: Monad m 
+          => (s -> Maybe (b, s))  -- produces output stream elements from state
+          -> (s -> a -> s)        -- consumes input stream elements into state
+          -> s                    -- initial state
+          -> Stream (Of a) m r    -- input stream
+          -> Stream (Of b) m r    -- output stream
 metamorph f g = loop
   where
     loop !s stream = case f s of
